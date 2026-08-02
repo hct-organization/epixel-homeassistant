@@ -1,4 +1,6 @@
-"""The five HTTP endpoints the device talks to. Contract: PROTOCOL.md
+"""The HTTP endpoints the display talks to, plus the browser preview.
+
+Contract: PROTOCOL.md
 
 This module imports NOTHING from __init__ (that would be circular); it reaches
 shared state through hass.data[DOMAIN].
@@ -10,6 +12,7 @@ import asyncio
 import functools
 import hmac
 import logging
+import secrets
 import time
 from datetime import timedelta
 
@@ -19,23 +22,30 @@ from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
+from . import preview as preview_page
 from .const import (
     API_BASE,
+    CONF_DEVICE_NAME,
     CONF_TOKEN,
+    DIM_MIN,
+    DIM_STEP,
     DOMAIN,
     HISTORY_MAX_HOURS,
     HISTORY_POINTS,
     LONGPOLL_MAX_S,
     PAIR_MAX_PENDING,
     PAIR_TTL_S,
+    PREVIEW_TTL_S,
     PROTOCOL_VERSION,
     SWITCHABLE_DOMAINS,
 )
+from .icons import supports_brightness
 from .model import build_view, key_map
 
 _LOGGER = logging.getLogger(__name__)
 
-_ACTIONS = {"toggle": "toggle", "on": "turn_on", "off": "turn_off"}
+_SWITCH_ACTIONS = {"toggle": "toggle", "on": "turn_on", "off": "turn_off"}
+_DIM_ACTIONS = ("set", "up", "down")
 
 
 def async_register_views(hass: HomeAssistant) -> None:
@@ -44,10 +54,32 @@ def async_register_views(hass: HomeAssistant) -> None:
     data = hass.data.get(DOMAIN)
     if data is None or data.get("views_ok"):
         return
-    for view in (PingView(), PairView(), StateView(), CmdView(), HistoryView()):
+    for view in (
+        PingView(),
+        PairView(),
+        StateView(),
+        CmdView(),
+        HistoryView(),
+        PreviewView(),
+    ):
         hass.http.register_view(view)
     data["views_ok"] = True
     _LOGGER.debug("ePiXeL endpoints registered under %s", API_BASE)
+
+
+def new_preview_key(hass: HomeAssistant) -> str:
+    """Mint a fresh capability key for the screen preview.
+
+    The preview shows entity names and current states, so it is not public. A
+    new key is issued each time the options flow opens and the previous one
+    stops working, which keeps a link pasted into a chat from staying useful.
+    """
+    key = secrets.token_urlsafe(16)
+    hass.data[DOMAIN]["preview"] = {
+        "key": key,
+        "expires": time.monotonic() + PREVIEW_TTL_S,
+    }
+    return key
 
 
 def _entry(hass: HomeAssistant) -> ConfigEntry | None:
@@ -192,7 +224,8 @@ class StateView(HomeAssistantView):
 
 
 class CmdView(HomeAssistantView):
-    """On/off. The device updates its UI optimistically and REVERTS on ok:false."""
+    """Switching and dimming. The device updates its UI optimistically and
+    REVERTS on ok:false."""
 
     url = f"{API_BASE}/cmd"
     name = "api:epixel:cmd"
@@ -214,23 +247,75 @@ class CmdView(HomeAssistantView):
             return self.json({"ok": False, "e": "entity_not_found"})
 
         domain = entity_id.split(".", 1)[0]
+        action = str(body.get("a", "toggle"))
+
+        if action in _DIM_ACTIONS:
+            return await self._dim(hass, entity_id, domain, action, body)
+
         if domain not in SWITCHABLE_DOMAINS:
             return self.json({"ok": False, "e": "not_switchable"})
 
-        service = _ACTIONS.get(str(body.get("a", "toggle")))
+        service = _SWITCH_ACTIONS.get(action)
         if service is None:
             return self.json({"ok": False, "e": "bad_action"})
 
-        try:
-            await hass.services.async_call(
-                domain, service, {"entity_id": entity_id}, blocking=True
-            )
-        except Exception as err:  # noqa: BLE001 -- service calls raise many types
-            _LOGGER.warning("ePiXeL command failed (%s.%s): %s", domain, service, err)
+        if not await self._call(hass, domain, service, {"entity_id": entity_id}):
             return self.json({"ok": False, "e": "service_failed"})
 
         state = hass.states.get(entity_id)
         return self.json({"ok": True, "v": 1 if state and state.state == "on" else 0})
+
+    async def _dim(self, hass, entity_id: str, domain: str, action: str, body: dict):
+        """Set, raise or lower a light's level.
+
+        `up` and `down` are resolved against the light's CURRENT level rather
+        than a level the device believes in. A device that missed an update, or
+        a light someone changed from a wall switch, would otherwise jump to the
+        wrong value on the first press.
+        """
+        state = hass.states.get(entity_id)
+        if domain != "light" or state is None or not supports_brightness(state.attributes):
+            return self.json({"ok": False, "e": "not_dimmable"})
+
+        current = 0
+        if state.state == "on":
+            raw = state.attributes.get("brightness")
+            current = 100 if raw is None else max(1, round(int(raw) * 100 / 255))
+
+        if action == "set":
+            try:
+                target = int(body.get("p"))
+            except (TypeError, ValueError):
+                return self.json({"ok": False, "e": "bad_level"})
+        elif action == "up":
+            target = current + DIM_STEP
+        else:
+            target = current - DIM_STEP
+
+        target = max(0, min(100, target))
+
+        # Anything under the floor is off, not "very dim". Sending
+        # brightness_pct=2 leaves a light that looks off but reports on, and
+        # the next press then raises it from 2 instead of from zero.
+        if target < DIM_MIN:
+            ok = await self._call(hass, "light", "turn_off", {"entity_id": entity_id})
+            return self.json({"ok": ok, "v": 0} if ok else {"ok": False, "e": "service_failed"})
+
+        ok = await self._call(
+            hass, "light", "turn_on", {"entity_id": entity_id, "brightness_pct": target}
+        )
+        if not ok:
+            return self.json({"ok": False, "e": "service_failed"})
+        return self.json({"ok": True, "v": target})
+
+    @staticmethod
+    async def _call(hass, domain: str, service: str, payload: dict) -> bool:
+        try:
+            await hass.services.async_call(domain, service, payload, blocking=True)
+        except Exception as err:  # noqa: BLE001 -- service calls raise many types
+            _LOGGER.warning("ePiXeL command failed (%s.%s): %s", domain, service, err)
+            return False
+        return True
 
 
 # ------------------------------------------------------------ 5. history
@@ -308,6 +393,54 @@ class HistoryView(HomeAssistantView):
                 "p": [int(round(value * 10)) for value in points],
             }
         )
+
+
+# ------------------------------------------------------------ 6. preview
+
+
+class PreviewView(HomeAssistantView):
+    """The pages as the display will draw them, in a browser.
+
+    Not part of the device protocol -- the display never calls this. It exists
+    so the person building a page can see the result without walking over to
+    the screen.
+    """
+
+    url = f"{API_BASE}/preview"
+    name = "api:epixel:preview"
+    requires_auth = False
+
+    async def get(self, request):
+        hass: HomeAssistant = request.app[KEY_HASS]
+        data = hass.data.get(DOMAIN) or {}
+        record = data.get("preview") or {}
+        supplied = str(request.query.get("k", ""))
+
+        valid = (
+            record.get("key")
+            and supplied
+            and hmac.compare_digest(supplied, record["key"])
+            and record.get("expires", 0) > time.monotonic()
+        )
+        if not valid:
+            return self.json({"e": "unauthorized"}, status_code=401)
+
+        entry = _entry(hass)
+        if entry is None:
+            return self.json({"e": "not_configured"}, status_code=404)
+
+        html = preview_page.render(
+            build_view(hass, entry),
+            hass.config.language,
+            entry.data.get(CONF_DEVICE_NAME) or "ePiXeL",
+        )
+        return web_response(html)
+
+
+def web_response(html: str):
+    from aiohttp import web
+
+    return web.Response(text=html, content_type="text/html", charset="utf-8")
 
 
 def _downsample(series: list[tuple[float, float]], count: int) -> list[float]:

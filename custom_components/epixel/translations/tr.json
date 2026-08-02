@@ -4,7 +4,9 @@
       "user": {
         "title": "ePiXeL ekranini bagla",
         "description": "Ekranda Ayarlar > Home Assistant > Sunucu Ara adimlarini izleyin. Ekranda gorunen 4 haneli kodu buraya yazin.",
-        "data": { "pin": "Ekrandaki kod" }
+        "data": {
+          "pin": "Ekrandaki kod"
+        }
       }
     },
     "error": {
@@ -18,11 +20,12 @@
   "options": {
     "step": {
       "init": {
-        "title": "ePiXeL sayfalari",
-        "description": "Ekranda gorunecek sayfalari burada kurarsiniz. Her sayfaya en fazla 6 kutu girer.",
+        "title": "ePiXeL sayfaları",
+        "description": "Ekranda görünecek sayfalar. Şu an **{count}** sayfa var.\n\nSayfaları burada kurup ekranda nasıl görüneceğini şu bağlantıdan görebilirsiniz — bağlantı bir saat geçerlidir:\n\n{preview}",
         "menu_options": {
           "add_page": "Sayfa ekle",
           "edit_page": "Sayfa duzenle",
+          "page_icons": "Simgeleri değiştir",
           "remove_page": "Sayfa sil",
           "save": "Kaydet ve cik"
         }
@@ -30,20 +33,40 @@
       "add_page": {
         "title": "Sayfa ekle",
         "description": "2 varlik = yan yana 2 kutu · 3-4 varlik = 2x2 · 5-6 varlik = 2x3",
-        "data": { "title": "Sayfa basligi", "entities": "Varliklar" }
+        "data": {
+          "title": "Sayfa basligi",
+          "entities": "Varliklar"
+        }
       },
       "edit_page": {
         "title": "Hangi sayfa?",
-        "data": { "index": "Sayfa" }
+        "data": {
+          "index": "Sayfa"
+        }
       },
       "edit_form": {
         "title": "Sayfayi duzenle",
         "description": "2 varlik = yan yana 2 kutu · 3-4 varlik = 2x2 · 5-6 varlik = 2x3",
-        "data": { "title": "Sayfa basligi", "entities": "Varliklar" }
+        "data": {
+          "title": "Sayfa basligi",
+          "entities": "Varliklar"
+        }
       },
       "remove_page": {
         "title": "Hangi sayfa silinsin?",
-        "data": { "index": "Sayfa" }
+        "data": {
+          "index": "Sayfa"
+        }
+      },
+      "page_icons": {
+        "title": "Hangi sayfanın simgeleri?",
+        "data": {
+          "index": "Sayfa"
+        }
+      },
+      "icon_form": {
+        "title": "Simgeler — {page}",
+        "description": "Her varlığın ekranda hangi simgeyle görüneceğini seçin. **Otomatik**, varlığın türünden karar verir ve çoğu durumda doğrudur."
       }
     },
     "error": {
@@ -52,6 +75,47 @@
     },
     "abort": {
       "too_many_pages": "En fazla 8 sayfa olusturabilirsiniz."
+    }
+  },
+  "selector": {
+    "icon": {
+      "options": {
+        "auto": "Otomatik",
+        "dot": "Nokta",
+        "bulb": "Ampul",
+        "dimmer": "Kısılabilir ışık",
+        "switch": "Anahtar",
+        "plug": "Priz",
+        "temp": "Sıcaklık",
+        "hum": "Nem",
+        "power": "Güç",
+        "energy": "Enerji",
+        "battery": "Pil",
+        "motion": "Hareket",
+        "door": "Kapı",
+        "window": "Pencere",
+        "lock": "Kilit",
+        "water": "Su",
+        "fire": "Yangın",
+        "gas": "Gaz",
+        "co2": "Karbondioksit",
+        "lux": "Işık seviyesi",
+        "press": "Basınç",
+        "fan": "Fan",
+        "wind": "Rüzgâr",
+        "rain": "Yağmur",
+        "signal": "Sinyal",
+        "clock": "Saat",
+        "person": "Kişi",
+        "tv": "Televizyon",
+        "music": "Ses",
+        "cool": "Soğutma",
+        "heat": "Isıtma",
+        "valve": "Vana",
+        "sun": "Güneş",
+        "moon": "Gece",
+        "shield": "Koruma"
+      }
     }
   }
 }

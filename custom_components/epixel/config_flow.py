@@ -8,6 +8,10 @@ direction also removes any need for a listening port on the device.
 PAGE BUILDER: built entirely from Home Assistant's own form UI -- no custom
 frontend. The user lays out pages on a machine with a keyboard and a mouse;
 the device only draws them.
+
+ICONS: chosen automatically from each entity's device class, which is right
+almost always. Changing them is a separate menu entry rather than a step in
+the middle of adding a page -- the common path stays two questions long.
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from homeassistant.helpers import selector
 
 from .const import (
     CONF_DEVICE_NAME,
+    CONF_ICONS,
     CONF_PAGES,
     CONF_TOKEN,
     DOMAIN,
@@ -32,6 +37,7 @@ from .const import (
     PAIR_MAX_ATTEMPTS,
     SUPPORTED_DOMAINS,
 )
+from .icons import AUTO, ICON_ORDER
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -58,6 +64,16 @@ def _page_schema(defaults: dict | None = None) -> vol.Schema:
                 )
             ),
         }
+    )
+
+
+def _icon_selector() -> selector.SelectSelector:
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[AUTO, *ICON_ORDER],
+            mode=selector.SelectSelectorMode.DROPDOWN,
+            translation_key="icon",
+        )
     )
 
 
@@ -148,26 +164,59 @@ def _find_pending(data: dict, pin: str) -> tuple[str, dict] | None:
 
 
 class EpixelOptionsFlow(config_entries.OptionsFlow):
-    """Page builder: add / edit / remove / save."""
+    """Page builder: add / edit / icons / remove / save."""
 
     def __init__(self) -> None:
         self._pages: list[dict] | None = None
-        self._edit_index: int | None = None
+        self._index: int | None = None
 
     def _load(self) -> list[dict]:
         if self._pages is None:
             self._pages = [
-                dict(page) for page in (self.config_entry.options or {}).get(CONF_PAGES, [])
+                {**page, "entities": list(page.get("entities", [])),
+                 CONF_ICONS: dict(page.get(CONF_ICONS) or {})}
+                for page in (self.config_entry.options or {}).get(CONF_PAGES, [])
             ]
         return self._pages
 
+    def _preview_url(self) -> str:
+        """A fresh, expiring link to the screen preview.
+
+        Minted on every visit to the menu, so a link that was pasted somewhere
+        stops working rather than lingering.
+        """
+        from homeassistant.helpers.network import NoURLAvailableError, get_url
+
+        from .views import new_preview_key
+
+        key = new_preview_key(self.hass)
+        try:
+            base = get_url(self.hass, prefer_external=False)
+        except NoURLAvailableError:
+            base = ""
+        return f"{base}/api/epixel/preview?k={key}"
+
     async def async_step_init(self, user_input: dict | None = None):
+        from . import ensure_data
+        from .views import async_register_views
+
+        ensure_data(self.hass)
+        async_register_views(self.hass)
+
         pages = self._load()
         options = ["add_page"]
         if pages:
-            options += ["edit_page", "remove_page"]
+            options += ["edit_page", "page_icons", "remove_page"]
         options.append("save")
-        return self.async_show_menu(step_id="init", menu_options=options)
+
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=options,
+            description_placeholders={
+                "count": str(len(pages)),
+                "preview": self._preview_url(),
+            },
+        )
 
     # -------------------------------------------------------------- add
 
@@ -183,6 +232,7 @@ class EpixelOptionsFlow(config_entries.OptionsFlow):
             if error:
                 errors["base"] = error
             else:
+                page[CONF_ICONS] = {}
                 pages.append(page)
                 return await self.async_step_init()
 
@@ -195,7 +245,7 @@ class EpixelOptionsFlow(config_entries.OptionsFlow):
     async def async_step_edit_page(self, user_input: dict | None = None):
         pages = self._load()
         if user_input is not None:
-            self._edit_index = int(user_input[CONF_INDEX])
+            self._index = int(user_input[CONF_INDEX])
             return await self.async_step_edit_form()
         return self.async_show_form(
             step_id="edit_page", data_schema=self._index_schema(pages)
@@ -203,7 +253,7 @@ class EpixelOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_edit_form(self, user_input: dict | None = None):
         pages = self._load()
-        index = self._edit_index or 0
+        index = self._index or 0
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -211,8 +261,16 @@ class EpixelOptionsFlow(config_entries.OptionsFlow):
             if error:
                 errors["base"] = error
             else:
+                # Icon choices for entities that survived the edit are kept;
+                # ones dropped from the page take their override with them.
+                previous = pages[index].get(CONF_ICONS) or {}
+                page[CONF_ICONS] = {
+                    entity_id: previous[entity_id]
+                    for entity_id in page["entities"]
+                    if entity_id in previous
+                }
                 pages[index] = page
-                self._edit_index = None
+                self._index = None
                 return await self.async_step_init()
 
         current = pages[index]
@@ -225,6 +283,46 @@ class EpixelOptionsFlow(config_entries.OptionsFlow):
                 }
             ),
             errors=errors,
+        )
+
+    # ------------------------------------------------------------ icons
+
+    async def async_step_page_icons(self, user_input: dict | None = None):
+        pages = self._load()
+        if user_input is not None:
+            self._index = int(user_input[CONF_INDEX])
+            return await self.async_step_icon_form()
+        return self.async_show_form(
+            step_id="page_icons", data_schema=self._index_schema(pages)
+        )
+
+    async def async_step_icon_form(self, user_input: dict | None = None):
+        pages = self._load()
+        index = self._index or 0
+        page = pages[index]
+        entities = page.get("entities", [])
+
+        if user_input is not None:
+            chosen = {
+                entity_id: value
+                for entity_id, value in user_input.items()
+                if entity_id in entities and value and value != AUTO
+            }
+            page[CONF_ICONS] = chosen
+            self._index = None
+            return await self.async_step_init()
+
+        stored = page.get(CONF_ICONS) or {}
+        schema = vol.Schema(
+            {
+                vol.Optional(entity_id, default=stored.get(entity_id, AUTO)): _icon_selector()
+                for entity_id in entities
+            }
+        )
+        return self.async_show_form(
+            step_id="icon_form",
+            data_schema=schema,
+            description_placeholders={"page": page.get("title") or "-"},
         )
 
     # ----------------------------------------------------------- remove

@@ -1,8 +1,14 @@
 # ePiXeL ⇄ Home Assistant — Local Protocol Contract
 
-**Version 1** · This document is the single source of truth for **both** the
+**Version 2** · This document is the single source of truth for **both** the
 Python integration and the display firmware. If one side needs to change,
 this file changes first.
+
+> **Changes from version 1** — a `dim` box type for lights that can be set to a
+> level rather than only switched, three new commands to drive it, two more
+> icons (`dimmer`, `switch`), a per-entity icon override chosen by the user,
+> and a stated guarantee about the text the device receives. A version 1 device
+> ignores what it does not recognise and keeps working.
 
 ## Overview
 
@@ -96,9 +102,9 @@ Pages, boxes and current values in **one document**. The device knows nothing el
   "rev": 413,
   "pages": [
     { "t": "Living room", "b": [
-      { "k":"a1b2c3", "n":"Ceiling light", "y":"sw",  "v":1,      "i":"bulb" },
+      { "k":"a1b2c3", "n":"Ceiling light", "y":"dim", "v":60,     "i":"dimmer" },
       { "k":"d4e5f6", "n":"Temperature",   "y":"num", "v":"22.4", "u":"°C", "i":"temp", "g":1 },
-      { "k":"7a8b9c", "n":"Humidity",      "y":"num", "v":"48",   "u":"%",  "i":"hum",  "g":1 },
+      { "k":"7a8b9c", "n":"Front door",    "y":"bin", "v":0,      "i":"door" },
       { "k":"0d1e2f", "n":"Desk socket",   "y":"sw",  "v":0,      "i":"plug" }
     ]}
   ]
@@ -108,19 +114,49 @@ Pages, boxes and current values in **one document**. The device knows nothing el
 | Field | Meaning |
 |---|---|
 | `k` | opaque key (short digest of the entity_id). **`entity_id` never reaches the device.** Commands and chart requests carry this back |
-| `n` | display name, **max 22 characters** (truncated by the integration) |
-| `y` | `sw` actionable · `num` number + unit · `bin` on/off read-only · `txt` text |
-| `v` | `sw`/`bin` → `1`/`0` · `num`/`txt` → string |
-| `u` | unit, when present |
+| `n` | display name, **max 22 characters** |
+| `y` | box type, see below |
+| `v` | value, meaning depends on `y` |
+| `u` | unit, when present (`num` only) |
 | `i` | icon name from the **fixed list below**. Unknown → `dot` |
 | `g` | `1` when this box has a chart |
+
+### Box types
+
+| `y` | `v` | Interaction |
+|---|---|---|
+| `sw` | `1` / `0` | Touch toggles it |
+| `dim` | `0`–`100` (percent; `0` is off) | Touch toggles, a level control sets it |
+| `bin` | `1` / `0` | Read-only |
+| `num` | string number, with `u` | Read-only; opens a chart when `g` is set |
+| `txt` | string | Read-only |
+
+A device that does not recognise a type must render it read-only rather than
+drop the box — the user placed it there and an empty slot reads as a fault.
+
+### Guarantees about `k` and `n`
+
+These two carry different weight and must not be confused.
+
+- **`k` is the machine identifier.** Exactly six characters, `[0-9a-f]` only.
+  No spaces, no accents, no punctuation, stable for as long as the entity
+  exists. Safe to use in a log line, a filename or a lookup key.
+- **`n` is for the human, and only for the human.** The integration
+  normalises it before sending: Unicode NFC, control characters and line
+  breaks replaced by spaces, runs of whitespace collapsed, ends trimmed,
+  then cut to 22 characters. It may still contain spaces and any script the
+  user's language uses. **Never derive an identifier from it.**
+
+Where truncation would make two boxes on one page identical, the integration
+keeps both ends of the longer name instead (`VitrinLedl…LED Şerit 1`), so the
+user is never shown two boxes they cannot tell apart.
 
 **Rules**
 - At most **6** boxes per page, at most **8** pages
 - Box count picks the layout: **2** → 1×2 · **3–4** → 2×2 · **5–6** → 2×3
 - `"pages": []` → the device **removes the Home Assistant page from its
   carousel** (it never shows an empty page)
-- A deleted entity still returns a box, as `"y":"txt","v":"—"`
+- A deleted or unavailable entity still returns a box, as `"y":"txt","v":"—"`
 
 ---
 
@@ -128,17 +164,35 @@ Pages, boxes and current values in **one document**. The device knows nothing el
 
 ```json
 { "k": "a1b2c3", "a": "toggle" }
+{ "k": "a1b2c3", "a": "set", "p": 40 }
 ```
 
-`a`: `toggle` | `on` | `off`
+| `a` | Applies to | Effect |
+|---|---|---|
+| `toggle` | `sw` | Invert |
+| `on` / `off` | `sw` | Set explicitly |
+| `set` | `dim` | Go to `p` percent (0–100) |
+| `up` / `down` | `dim` | Move ten percent from **the light's current level** |
 
 ```json
-{ "ok": true,  "v": 1 }
+{ "ok": true,  "v": 40 }
 { "ok": false, "e": "entity_not_found" }
 ```
 
-Error codes: `entity_not_found` · `not_switchable` · `bad_action` ·
-`service_failed` · `unauthorized`
+`v` in the reply is the level the entity actually reached, so the device can
+correct itself without waiting for the next `/view`.
+
+Error codes: `entity_not_found` · `not_switchable` · `not_dimmable` ·
+`bad_action` · `bad_level` · `service_failed` · `unauthorized`
+
+**Two rules for dimming**
+
+- `up` and `down` are resolved against the light's **live** level, not against
+  whatever the device last displayed. A light someone changed at a wall switch
+  would otherwise jump to the wrong value on the first press.
+- A target under **5 percent** turns the light **off** rather than setting a
+  level nobody can see. Sending 2 percent leaves a lamp that looks off but
+  reports on, and the next press then climbs from 2 instead of from zero.
 
 The device updates its UI **optimistically before sending**; on `ok:false` it
 **reverts and tells the user why**.
@@ -160,21 +214,53 @@ The device updates its UI **optimistically before sending**; on `ok:false` it
 
 ---
 
-## Icon list (fixed)
+## Not part of the device protocol: `GET /preview`
 
-Embedded in the device as FontAwesome glyphs. The integration maps
-`device_class`, unit and domain onto these, falling back to `dot`.
+`GET /preview?k=<key>` returns an HTML page showing the configured pages drawn
+at the display's real resolution. **The display never calls this** — it exists
+so the person building a page can see the result without walking over to the
+screen.
+
+It renders from the same `build_view` the device consumes, so what it shows is
+what the device receives; only the paint is reproduced separately.
+
+The page carries entity names and current states, so it is not public. The key
+is minted each time the options flow is opened, is valid for one hour, and
+replaces the previous one — a link pasted somewhere stops working instead of
+lingering.
+
+---
+
+## Icon list (fixed, 34 names)
 
 ```
-dot     bulb    plug    temp    hum     power   energy  battery
-motion  door    window  lock    water   fire    gas     co2
-lux     press   fan     wind    rain    signal  clock   person
-tv      music   cool    heat    valve   sun     moon    shield
+dot     bulb    dimmer  switch  plug    temp    hum     power
+energy  battery motion  door    window  lock    water   fire
+gas     co2     lux     press   fan     wind    rain    signal
+clock   person  tv      music   cool    heat    valve   sun
+moon    shield
 ```
 
-**To grow this list:** add the glyph to the device font first
-(`tools/generate_fonts.sh` in the firmware repository), then start emitting the
-new name. The reverse order draws empty squares on the screen.
+The shapes are **Material Design Icons** — the same family Home Assistant
+itself uses — so an icon on the display matches the one beside the entity in
+Home Assistant. They live in `custom_components/epixel/icon_paths.py` together
+with their upstream names, and the firmware glyphs are generated from that same
+file, so the preview and the hardware cannot drift apart.
+
+**How an icon is chosen**
+
+1. If the user picked one for that entity, it wins.
+2. Otherwise: a light that reports a brightness capability gets `dimmer`, any
+   other light `bulb`.
+3. Otherwise: `device_class`, then unit of measurement, then domain.
+4. Otherwise `dot`.
+
+A stored choice that is not in the list above is discarded and step 2 runs
+instead — a name left over from an older release, or a hand-edited backup,
+must never reach the device and draw an empty square.
+
+**To grow this list:** add the glyph to the device font first, then start
+emitting the new name. The reverse order draws empty squares on the screen.
 
 ---
 

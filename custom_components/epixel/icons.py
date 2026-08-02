@@ -1,25 +1,28 @@
-"""Maps a Home Assistant device_class (or unit, or domain) to an ePiXeL icon name.
+"""Chooses which of the display's icons represents an entity.
 
-WHY NOT mdi: Home Assistant's mdi icon namespace has 7000+ names and cannot fit
-on the device. `device_class` is a small, stable vocabulary -- binding the
-mapping to it keeps working for years without firmware changes.
+WHY NOT PASS mdi NAMES THROUGH: Home Assistant's icon namespace runs to several
+thousand names; the display carries a fixed set. `device_class` is a small,
+stable vocabulary, so binding the mapping to it keeps working for years without
+a firmware change.
 
-The returned name MUST come from the fixed set in PROTOCOL.md. Returning
-anything else would draw an empty box on the screen, so unknown inputs fall
-back to "dot".
+The set itself lives in `icon_paths.py` -- one place, so the picker, the
+on-screen preview and the glyphs embedded in the firmware cannot drift apart.
+A user can override the choice per entity when building a page.
 """
 
-FALLBACK = "dot"
+from __future__ import annotations
 
-# Must stay identical to the icon list in PROTOCOL.md. A name whose glyph is not
-# in the device font does NOT belong here -- generate the font first, then grow
-# this set. The reverse order shows empty squares to the user.
-VALID = frozenset({
-    "dot", "bulb", "plug", "temp", "hum", "power", "energy", "battery",
-    "motion", "door", "window", "lock", "water", "fire", "gas", "co2",
-    "lux", "press", "fan", "wind", "rain", "signal", "clock", "person",
-    "tv", "music", "cool", "heat", "valve", "sun", "moon", "shield",
-})
+from .icon_paths import ICON_PATHS
+
+FALLBACK = "dot"
+AUTO = "auto"
+
+#: Every icon the display can draw. Single source of truth.
+VALID = frozenset(ICON_PATHS)
+
+#: Same set, in the order the picker lists them -- related shapes stay together
+#: so the dropdown can be scanned instead of read.
+ICON_ORDER = tuple(ICON_PATHS)
 
 BY_DEVICE_CLASS = {
     "temperature": "temp",
@@ -70,7 +73,7 @@ BY_DEVICE_CLASS = {
     "tamper": "shield",
     "outlet": "plug",
     "plug": "plug",
-    "switch": "plug",
+    "switch": "switch",
 }
 
 BY_UNIT = {
@@ -89,9 +92,9 @@ BY_UNIT = {
 
 BY_DOMAIN = {
     "light": "bulb",
-    "switch": "plug",
+    "switch": "switch",
+    "input_boolean": "switch",
     "fan": "fan",
-    "input_boolean": "dot",
     "binary_sensor": "dot",
     "sensor": "dot",
     "media_player": "tv",
@@ -101,13 +104,38 @@ BY_DOMAIN = {
 }
 
 
-def pick(domain: str, device_class: str | None, unit: str | None = None) -> str:
+def supports_brightness(attrs) -> bool:
+    """True when a light can be dimmed rather than only switched.
+
+    Read from the entity's own capability report, not from a list of models --
+    a light that gains dimming after a firmware update is picked up on its own.
+    """
+    modes = attrs.get("supported_color_modes") or ()
+    dimmable = {"brightness", "color_temp", "hs", "rgb", "rgbw", "rgbww", "xy", "white"}
+    return any(str(mode) in dimmable for mode in modes)
+
+
+def pick(domain: str, attrs) -> str:
     """Choose an icon for a box. The result is always a member of VALID."""
+    if domain == "light":
+        return "dimmer" if supports_brightness(attrs) else "bulb"
+
     for candidate in (
-        BY_DEVICE_CLASS.get(device_class or ""),
-        BY_UNIT.get((unit or "").strip()),
+        BY_DEVICE_CLASS.get(str(attrs.get("device_class") or "")),
+        BY_UNIT.get(str(attrs.get("unit_of_measurement") or "").strip()),
         BY_DOMAIN.get(domain),
     ):
         if candidate and candidate in VALID:
             return candidate
     return FALLBACK
+
+
+def normalise(name: str | None) -> str | None:
+    """Accept a stored override only if the display can actually draw it.
+
+    A name that survived from an older release, or a typo in a restored
+    backup, would otherwise reach the device and draw an empty square.
+    """
+    if not name or name == AUTO:
+        return None
+    return name if name in VALID else None

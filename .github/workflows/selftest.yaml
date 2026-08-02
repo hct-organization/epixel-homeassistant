@@ -1,0 +1,21 @@
+name: selftest
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  model:
+    name: page model, icons, preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # No Home Assistant install: the parts under test are plain functions
+      # over entity state, and gating on a full install would make the check
+      # slow enough that people stop running it.
+      - run: python3 tools/selftest.py

@@ -7,6 +7,13 @@
 
 <h1 align="center">ePiXeL Display — Home Assistant Integration</h1>
 
+> [!IMPORTANT]
+> **Not currently maintained.** Support for this integration has been withdrawn
+> from the ePiXeL display firmware, so a current device will not talk to it.
+> The repository stays up for reference and the protocol contract in
+> [PROTOCOL.md](PROTOCOL.md) remains accurate for the firmware versions that
+> did carry it. Please do not install it expecting it to work.
+
 <p align="center">
   <b>Your lights, sockets and sensors on a real screen.<br>Touch to switch. Tap to chart. Nothing leaves your network.</b>
 </p>

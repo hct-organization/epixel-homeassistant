@@ -63,6 +63,22 @@ No auth. Called **every 2 seconds** while the pairing screen is open.
 combination — the person approving is a logged-in Home Assistant administrator
 typing the code from their own screen, which an attacker cannot see.
 
+### First pairing: expect 404 until the dialog is open
+
+Home Assistant does not run an integration's `async_setup` until a config entry
+exists, so on a fresh install the endpoints do not exist yet. The integration
+brings them up as soon as the user opens **Add Integration → ePiXeL**.
+
+Consequences for the device:
+
+- A `404` on `ping` or `pair` does **not** mean "the integration is missing".
+  The device must say *"open Add Integration → ePiXeL in Home Assistant"* — a
+  message that is correct whether the integration is absent or merely not yet
+  loaded.
+- The device must **keep retrying** rather than give up on the first 404.
+- This applies only to the first pairing. Once an entry exists, `async_setup`
+  runs on every Home Assistant start and the endpoints are always up.
+
 ---
 
 ## 3. `GET /view` — everything

@@ -77,9 +77,25 @@ class EpixelConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def async_step_user(self, user_input: dict | None = None):
-        from . import ensure_data  # late import: avoids a circular dependency
+        # Late imports: avoid a circular dependency at module load.
+        from . import ensure_data
+        from .views import async_register_views
 
+        # The endpoints MUST come up here, not only in async_setup.
+        #
+        # Home Assistant loads just the config_flow module when a flow starts;
+        # the component's async_setup does not run until a config entry
+        # exists. Registering the views only there produced a deadlock:
+        # /pair needs async_setup, async_setup needs an entry, the entry needs
+        # a successful pairing, and the pairing needs /pair. Nothing could
+        # ever pair on a fresh install.
+        #
+        # Opening them here means the device finds them the moment the user
+        # opens this dialog. After the first entry exists async_setup runs on
+        # every start, so this only matters for the very first pairing.
         data = ensure_data(self.hass)
+        async_register_views(self.hass)
+
         errors: dict[str, str] = {}
 
         if user_input is not None:

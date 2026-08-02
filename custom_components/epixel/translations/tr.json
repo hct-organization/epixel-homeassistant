@@ -1,0 +1,57 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ePiXeL ekranini bagla",
+        "description": "Ekranda Ayarlar > Home Assistant > Sunucu Ara adimlarini izleyin. Ekranda gorunen 4 haneli kodu buraya yazin.",
+        "data": { "pin": "Ekrandaki kod" }
+      }
+    },
+    "error": {
+      "no_device": "Bu kodla eslesme isteyen bir ekran bulunamadi. Kod ekranda hala gorunuyor mu? Kodun omru 3 dakika."
+    },
+    "abort": {
+      "already_configured": "Zaten bagli bir ePiXeL ekrani var. Yeniden eslesmek icin once mevcut baglantiyi silin.",
+      "too_many_attempts": "Cok fazla yanlis deneme. Ekranda yeni bir kod uretip tekrar deneyin."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "ePiXeL sayfalari",
+        "description": "Ekranda gorunecek sayfalari burada kurarsiniz. Her sayfaya en fazla 6 kutu girer.",
+        "menu_options": {
+          "add_page": "Sayfa ekle",
+          "edit_page": "Sayfa duzenle",
+          "remove_page": "Sayfa sil",
+          "save": "Kaydet ve cik"
+        }
+      },
+      "add_page": {
+        "title": "Sayfa ekle",
+        "description": "2 varlik = yan yana 2 kutu · 3-4 varlik = 2x2 · 5-6 varlik = 2x3",
+        "data": { "title": "Sayfa basligi", "entities": "Varliklar" }
+      },
+      "edit_page": {
+        "title": "Hangi sayfa?",
+        "data": { "index": "Sayfa" }
+      },
+      "edit_form": {
+        "title": "Sayfayi duzenle",
+        "description": "2 varlik = yan yana 2 kutu · 3-4 varlik = 2x2 · 5-6 varlik = 2x3",
+        "data": { "title": "Sayfa basligi", "entities": "Varliklar" }
+      },
+      "remove_page": {
+        "title": "Hangi sayfa silinsin?",
+        "data": { "index": "Sayfa" }
+      }
+    },
+    "error": {
+      "no_entities": "En az bir varlik secin.",
+      "too_many_entities": "Bir sayfaya en fazla 6 varlik sigar. Fazlasini yeni bir sayfaya ekleyin."
+    },
+    "abort": {
+      "too_many_pages": "En fazla 8 sayfa olusturabilirsiniz."
+    }
+  }
+}

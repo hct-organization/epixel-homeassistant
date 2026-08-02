@@ -1,0 +1,21 @@
+name: HACS
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  validate:
+    name: HACS validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # `brands` is skipped until the domain is submitted to
+          # home-assistant/brands. It is only required for the HACS
+          # default store, not for a custom repository.
+          ignore: brands

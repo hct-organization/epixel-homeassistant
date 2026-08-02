@@ -1,0 +1,57 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect your ePiXeL screen",
+        "description": "On the screen go to Settings > Home Assistant > Find server. Enter the 4-digit code shown on the screen.",
+        "data": { "pin": "Code on screen" }
+      }
+    },
+    "error": {
+      "no_device": "No screen is requesting to pair with that code. Is the code still on the screen? Codes expire after 3 minutes."
+    },
+    "abort": {
+      "already_configured": "An ePiXeL screen is already connected. Remove the existing entry before pairing again.",
+      "too_many_attempts": "Too many failed attempts. Generate a new code on the screen and try again."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "ePiXeL pages",
+        "description": "Build the pages shown on the screen. Each page holds up to 6 boxes.",
+        "menu_options": {
+          "add_page": "Add page",
+          "edit_page": "Edit page",
+          "remove_page": "Remove page",
+          "save": "Save and exit"
+        }
+      },
+      "add_page": {
+        "title": "Add page",
+        "description": "2 entities = 1x2 · 3-4 entities = 2x2 · 5-6 entities = 2x3",
+        "data": { "title": "Page title", "entities": "Entities" }
+      },
+      "edit_page": {
+        "title": "Which page?",
+        "data": { "index": "Page" }
+      },
+      "edit_form": {
+        "title": "Edit page",
+        "description": "2 entities = 1x2 · 3-4 entities = 2x2 · 5-6 entities = 2x3",
+        "data": { "title": "Page title", "entities": "Entities" }
+      },
+      "remove_page": {
+        "title": "Which page to remove?",
+        "data": { "index": "Page" }
+      }
+    },
+    "error": {
+      "no_entities": "Select at least one entity.",
+      "too_many_entities": "A page holds at most 6 entities. Put the rest on a new page."
+    },
+    "abort": {
+      "too_many_pages": "You can create at most 8 pages."
+    }
+  }
+}

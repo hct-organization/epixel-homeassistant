@@ -8,7 +8,16 @@ renders the pages in your terminal.
 Usage:
     python3 tools/fake_device.py 192.168.1.40
     python3 tools/fake_device.py 192.168.1.40 --port 8123
-    python3 tools/fake_device.py 192.168.1.40 --reset      # forget saved token
+    python3 tools/fake_device.py 192.168.1.40 --reset          # forget saved token
+
+Diagnosing a switch that does nothing on the real display:
+
+    python3 tools/fake_device.py 192.168.1.40 --toggle a1b2c3
+    python3 tools/fake_device.py 192.168.1.40 --dim a1b2c3 up
+
+Those send the same request the display sends. If they work, the server side
+is sound and the fault is in the display; if they fail, the reply says why.
+The key comes from the box listing this tool prints.
 
 Standard library only -- nothing to install.
 """
@@ -140,11 +149,56 @@ def wait_for_integration(base: str) -> dict:
     sys.exit("FAILED: the integration never answered within 5 minutes")
 
 
+def run_command(base: str, token: str, args) -> None:
+    """Send one command and report exactly what came back.
+
+    This exists to split a fault in half. When a switch on the display does
+    nothing, the cause is either the display's command path or the server's.
+    Running the same command from here answers which, without guessing.
+    """
+    if args.toggle:
+        key, body = args.toggle, {"k": args.toggle, "a": "toggle"}
+    else:
+        key, action = args.dim[0], args.dim[1]
+        if action in ("up", "down"):
+            body = {"k": key, "a": action}
+        else:
+            try:
+                body = {"k": key, "a": "set", "p": int(action)}
+            except ValueError:
+                sys.exit(f"dim: '{action}' up, down ya da 0-100 olmali")
+
+    print(f"\n-> POST /cmd {json.dumps(body, ensure_ascii=False)}")
+    status, reply = call(base, "/cmd", token=token, body=body)
+    print(f"<- HTTP {status}  {json.dumps(reply, ensure_ascii=False)}")
+
+    if status == 200 and reply.get("ok"):
+        print(f"\nSERVER SIDE IS SOUND. The entity reached level {reply.get('v')}.")
+        print("If the display still does nothing, the fault is in the display's")
+        print("command path -- check the HA_UI / HA_SVC / HA_NET lines in its log.")
+    elif status == 401:
+        print("\n401: this token is no longer valid. Pair again.")
+    elif status == 200:
+        print(f"\nSERVER REFUSED: {reply.get('e')}")
+        print("  entity_not_found -> the key is not on any page any more")
+        print("  not_switchable   -> that entity cannot be switched")
+        print("  service_failed   -> Home Assistant refused the service call")
+    else:
+        print(f"\nUNEXPECTED: HTTP {status}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("host", help="192.168.1.20, 192.168.1.20:8123 or a full URL")
     parser.add_argument("--port", type=int, default=8123)
     parser.add_argument("--reset", action="store_true", help="forget the saved token")
+    parser.add_argument(
+        "--toggle", metavar="KEY",
+        help="send one toggle for a box key and exit -- splits a fault in half: "
+             "if this works the server side is sound and the fault is in the display")
+    parser.add_argument(
+        "--dim", nargs=2, metavar=("KEY", "up|down|0-100"),
+        help="send one dim command and exit")
     args = parser.parse_args()
 
     host, port = parse_target(args.host, args.port)
@@ -172,6 +226,10 @@ def main() -> None:
         token = pair(base)
         with open(STATE_FILE, "w") as handle:
             handle.write(token)
+
+    if args.toggle or args.dim:
+        run_command(base, token, args)
+        return
 
     print("\nLong polling. Toggle a light in Home Assistant -- it should land instantly.")
     print("Ctrl+C to quit.\n")

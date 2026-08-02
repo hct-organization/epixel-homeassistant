@@ -1,0 +1,1030 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ePiXeL — Sistem Mimarisi / System Architecture</title>
+<meta name="description" content="ePiXeL information display: architecture, services, network topology and security. HCT Bilisim.">
+<meta name="color-scheme" content="light dark">
+<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}img{max-width:100%}</style>
+
+<style>
+  :root{
+    --bg:#F2F4F7; --surface:#FFFFFF; --surface-2:#E9EDF2;
+    --line:#C6D0DB; --line-soft:#E0E6ED;
+    --text:#131A23; --text-2:#4A5563; --text-3:#78838F;
+    --accent:#9C6D24; --accent-2:#3F5D7A; --accent-soft:#F1E4C9;
+    --ok:#2C6E52; --plan:#6E6046;
+    --glow:rgba(156,109,36,.16); --drop:rgba(19,26,35,.24); --ground:rgba(19,26,35,.20);
+    --font-sans: ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --font-mono: ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0B1017; --surface:#111823; --surface-2:#18212E;
+      --line:#26313F; --line-soft:#1B2431;
+      --text:#E7ECF2; --text-2:#A4B0BE; --text-3:#6E7B8A;
+      --accent:#D8A44B; --accent-2:#7FA3C7; --accent-soft:#372B15;
+      --ok:#57B392; --plan:#B39C71;
+      --glow:rgba(216,164,75,.13); --drop:rgba(0,0,0,.55); --ground:rgba(0,0,0,.48);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#F2F4F7; --surface:#FFFFFF; --surface-2:#E9EDF2;
+    --line:#C6D0DB; --line-soft:#E0E6ED;
+    --text:#131A23; --text-2:#4A5563; --text-3:#78838F;
+    --accent:#9C6D24; --accent-2:#3F5D7A; --accent-soft:#F1E4C9;
+    --ok:#2C6E52; --plan:#6E6046;
+    --glow:rgba(156,109,36,.16); --drop:rgba(19,26,35,.24); --ground:rgba(19,26,35,.20);
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B1017; --surface:#111823; --surface-2:#18212E;
+    --line:#26313F; --line-soft:#1B2431;
+    --text:#E7ECF2; --text-2:#A4B0BE; --text-3:#6E7B8A;
+    --accent:#D8A44B; --accent-2:#7FA3C7; --accent-soft:#372B15;
+    --ok:#57B392; --plan:#B39C71;
+    --glow:rgba(216,164,75,.13); --drop:rgba(0,0,0,.55); --ground:rgba(0,0,0,.48);
+  }
+
+  html{ -webkit-text-size-adjust:100%; scroll-behavior:smooth; }
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{animation:none!important;transition:none!important} }
+
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:var(--font-sans);
+    font-size:16px; line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  html[lang="tr"] [lang="en"]{ display:none; }
+  html[lang="en"] [lang="tr"]{ display:none; }
+
+  .wrap{ max-width:1120px; margin:0 auto; padding:0 28px; }
+
+  /* ---------- masthead ---------- */
+  header.top{
+    position:sticky; top:0; z-index:20;
+    background:color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter:saturate(1.4) blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .top-in{ display:flex; align-items:center; gap:20px; height:60px; }
+  .mark{ display:flex; align-items:baseline; gap:10px; margin-right:auto; min-width:0; }
+  .mark b{ font-size:1.05rem; font-weight:700; letter-spacing:-.02em; }
+  .mark span{
+    font-family:var(--font-mono); font-size:.66rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--text-3); white-space:nowrap;
+  }
+  .langs{ display:flex; border:1px solid var(--line); border-radius:2px; overflow:hidden; }
+  .langs button{
+    font-family:var(--font-mono); font-size:.7rem; letter-spacing:.1em;
+    padding:6px 12px; background:transparent; color:var(--text-2);
+    border:0; cursor:pointer; line-height:1.4;
+  }
+  .langs button+button{ border-left:1px solid var(--line); }
+  .langs button[aria-pressed="true"]{ background:var(--accent); color:var(--bg); }
+  .langs button:focus-visible{ outline:2px solid var(--accent-2); outline-offset:-2px; }
+
+  /* ---------- hero ---------- */
+  .hero{ padding:72px 0 56px; border-bottom:1px solid var(--line); }
+  .eyebrow{
+    font-family:var(--font-mono); font-size:.7rem; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--accent); margin-bottom:20px;
+  }
+  h1{
+    font-size:clamp(2rem,5.2vw,3.15rem); line-height:1.08;
+    letter-spacing:-.032em; font-weight:700; text-wrap:balance; margin-bottom:22px;
+  }
+  .lede{ font-size:1.075rem; color:var(--text-2); max-width:62ch; }
+  .meta{
+    display:flex; flex-wrap:wrap; gap:8px 28px; margin-top:32px;
+    font-family:var(--font-mono); font-size:.72rem; letter-spacing:.05em; color:var(--text-3);
+  }
+  .meta b{ color:var(--text-2); font-weight:500; }
+
+  /* ---------- product shots ---------- */
+  .shot{ position:relative; display:flex; justify-content:center; padding:10px 0 30px; }
+  .shot::before{
+    content:""; position:absolute; inset:4% 0 14%;
+    background:radial-gradient(58% 52% at 50% 44%, var(--glow), transparent 70%);
+    z-index:0;
+  }
+  .shot::after{
+    content:""; position:absolute; left:16%; right:16%; bottom:12px; height:24px;
+    background:radial-gradient(50% 50% at 50% 50%, var(--ground), transparent 72%);
+    z-index:0;
+  }
+  .shot img{
+    position:relative; z-index:1; display:block;
+    width:100%; height:auto; max-width:340px;
+    filter:drop-shadow(0 16px 24px var(--drop));
+  }
+  figure.shot figcaption{
+    position:absolute; left:0; right:0; bottom:-4px; z-index:2;
+    font-family:var(--font-mono); font-size:.62rem; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--text-3); text-align:center;
+  }
+
+  .hero-grid{ display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:64px; align-items:center; }
+  .hw-top{ display:grid; grid-template-columns:minmax(0,1fr) 240px; gap:48px; align-items:center; margin-bottom:8px; }
+  .hw-top .shot img{ max-width:240px; }
+  @media (max-width:860px){
+    .hero-grid,.hw-top{ grid-template-columns:1fr; gap:28px; }
+    .shot img{ max-width:280px; }
+  }
+
+  /* ---------- highlights ---------- */
+  .highlights{ border-bottom:1px solid var(--line); padding:46px 0 50px; }
+  .hl-lead{ font-size:1.02rem; max-width:70ch; }
+  .hl-lead+.hl-lead{ margin-top:14px; }
+  .hl-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(252px,1fr)); gap:26px 40px; margin-top:36px; }
+  .hl{ border-top:1px solid var(--line); padding-top:13px; }
+  .hl .cat{
+    font-family:var(--font-mono); font-size:.63rem; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--accent); display:block;
+  }
+  .hl h5{ font-size:.96rem; font-weight:650; letter-spacing:-.012em; margin:7px 0 6px; }
+  .hl p{ font-size:.885rem; margin:0; max-width:none; }
+
+  /* ---------- doc grid ---------- */
+  .doc{ display:grid; grid-template-columns:186px minmax(0,1fr); gap:64px; padding:56px 0 0; }
+  nav.toc{ position:sticky; top:84px; align-self:start; }
+  nav.toc ol{ list-style:none; display:flex; flex-direction:column; gap:1px; }
+  nav.toc a{
+    display:flex; gap:10px; padding:6px 0;
+    font-family:var(--font-mono); font-size:.72rem; letter-spacing:.04em;
+    color:var(--text-3); text-decoration:none; border-bottom:1px solid var(--line-soft);
+  }
+  nav.toc a:hover{ color:var(--accent); }
+  nav.toc a:focus-visible{ outline:2px solid var(--accent-2); outline-offset:2px; }
+  nav.toc a i{ font-style:normal; color:var(--accent); }
+
+  section{ padding-bottom:64px; scroll-margin-top:80px; }
+  .sec-head{ border-top:2px solid var(--text); padding-top:14px; margin-bottom:28px; }
+  .sec-num{
+    font-family:var(--font-mono); font-size:.7rem; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--accent); display:block; margin-bottom:8px;
+  }
+  h2{ font-size:clamp(1.35rem,3vw,1.75rem); letter-spacing:-.022em; font-weight:700; line-height:1.2; text-wrap:balance; }
+  h3{ font-size:1.02rem; font-weight:650; letter-spacing:-.01em; margin:32px 0 10px; }
+  h4{
+    font-family:var(--font-mono); font-size:.7rem; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--text-3); margin:26px 0 10px;
+  }
+  p{ max-width:68ch; color:var(--text-2); }
+  p+p{ margin-top:14px; }
+  p.tight{ margin-top:8px; }
+  strong{ color:var(--text); font-weight:620; }
+  a{ color:var(--accent); text-underline-offset:3px; }
+
+  ul.list{ list-style:none; max-width:68ch; margin-top:12px; display:flex; flex-direction:column; gap:9px; }
+  ul.list li{ position:relative; padding-left:20px; color:var(--text-2); }
+  ul.list li::before{
+    content:""; position:absolute; left:2px; top:.62em;
+    width:7px; height:1px; background:var(--accent);
+  }
+
+  /* ---------- cards ---------- */
+  .cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(238px,1fr)); gap:14px; margin-top:20px; }
+  .card{
+    background:var(--surface); border:1px solid var(--line);
+    padding:18px 18px 20px; position:relative;
+  }
+  .card::after{
+    content:""; position:absolute; right:-1px; top:-1px;
+    width:9px; height:9px;
+    border-top:2px solid var(--accent); border-right:2px solid var(--accent);
+  }
+  .card h5{
+    font-size:.92rem; font-weight:650; letter-spacing:-.01em; margin-bottom:8px;
+  }
+  .card p{ font-size:.875rem; margin:0; }
+  .card ul.list{ margin-top:8px; }
+  .card ul.list li{ font-size:.855rem; }
+
+  /* ---------- tables ---------- */
+  .tbl-scroll{ overflow-x:auto; margin-top:18px; border:1px solid var(--line); background:var(--surface); }
+  table{ border-collapse:collapse; width:100%; font-size:.875rem; min-width:460px; }
+  th,td{ text-align:left; padding:11px 16px; border-bottom:1px solid var(--line-soft); vertical-align:top; }
+  thead th{
+    font-family:var(--font-mono); font-size:.66rem; letter-spacing:.13em; text-transform:uppercase;
+    color:var(--text-3); background:var(--surface-2); border-bottom:1px solid var(--line); font-weight:500;
+  }
+  tbody tr:last-child td{ border-bottom:0; }
+  td:first-child{ color:var(--text); font-weight:550; width:34%; }
+  td.num, td .mono{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:.82rem; }
+
+  .pill{
+    display:inline-block; font-family:var(--font-mono); font-size:.62rem;
+    letter-spacing:.1em; text-transform:uppercase; padding:2px 8px;
+    border:1px solid currentColor; border-radius:999px; white-space:nowrap;
+  }
+  .pill.on{ color:var(--ok); }
+  .pill.plan{ color:var(--plan); }
+
+  /* ---------- diagram ---------- */
+  .diagram{ margin-top:24px; overflow-x:auto; padding-bottom:4px; }
+  .zone{
+    border:1px solid var(--line); background:var(--surface);
+    padding:16px; min-width:520px;
+  }
+  .zone.platform{ border-style:dashed; background:var(--surface-2); }
+  .zone-label{
+    font-family:var(--font-mono); font-size:.64rem; letter-spacing:.15em;
+    text-transform:uppercase; color:var(--text-3); margin-bottom:14px;
+  }
+  .row{ display:flex; align-items:stretch; gap:0; flex-wrap:nowrap; }
+  .node{
+    flex:1; border:1px solid var(--line); background:var(--bg);
+    padding:12px 14px; min-width:0;
+  }
+  .node.key{ border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent-soft); }
+  .node b{ display:block; font-size:.86rem; font-weight:650; letter-spacing:-.01em; }
+  .node span{ display:block; font-family:var(--font-mono); font-size:.66rem; color:var(--text-3); margin-top:4px; letter-spacing:.03em; }
+  .link{
+    flex:0 0 84px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family:var(--font-mono); font-size:.6rem; letter-spacing:.08em; color:var(--text-3); text-align:center;
+  }
+  .link i{ font-style:normal; display:block; width:100%; border-top:1px solid var(--line); margin:6px 0; }
+  .vlink{
+    display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 0;
+    font-family:var(--font-mono); font-size:.62rem; letter-spacing:.08em; color:var(--accent); text-align:center;
+  }
+  .vlink i{ font-style:normal; width:1px; height:18px; background:var(--accent); display:block; }
+
+  .note{
+    border-left:2px solid var(--accent); background:var(--surface);
+    padding:14px 18px; margin-top:22px; max-width:68ch;
+  }
+  .note p{ font-size:.9rem; margin:0; }
+  .note p+p{ margin-top:8px; }
+
+  footer{
+    border-top:1px solid var(--line); margin-top:24px; padding:40px 0 64px;
+    display:flex; flex-wrap:wrap; gap:24px 48px; align-items:flex-start;
+  }
+  footer div{ min-width:200px; }
+  footer p{ font-size:.86rem; }
+  .fmark{ font-family:var(--font-mono); font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:var(--text-3); margin-bottom:8px; }
+
+  @media (max-width:900px){
+    .doc{ grid-template-columns:1fr; gap:32px; padding-top:36px; }
+    nav.toc{ position:static; }
+    nav.toc ol{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:0 18px; }
+    .hero{ padding:48px 0 40px; }
+  }
+
+  @media print{
+    header.top,nav.toc{ display:none; }
+    body{ background:#fff; color:#000; font-size:11pt; }
+    .doc{ grid-template-columns:1fr; }
+    section{ break-inside:avoid; }
+  }
+</style>
+
+<header class="top">
+  <div class="wrap top-in">
+    <span class="mark">
+      <b>ePiXeL</b>
+      <span lang="tr">HCT Bilişim · Sistem Mimarisi</span>
+      <span lang="en">HCT Bilişim · System Architecture</span>
+    </span>
+    <div class="langs" role="group" aria-label="Language">
+      <button type="button" data-set="tr" aria-pressed="true">TR</button>
+      <button type="button" data-set="en" aria-pressed="false">EN</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow" lang="tr">Teknik Doküman · Sürüm 1.0</div>
+    <div class="eyebrow" lang="en">Technical Document · Revision 1.0</div>
+
+    <h1 lang="tr">Kurumsal bilgi ekranı:<br>mimari, servisler ve güvenlik</h1>
+    <h1 lang="en">Enterprise information display:<br>architecture, services and security</h1>
+
+    <p class="lede" lang="tr">ePiXeL, <strong>HCT Bilişim</strong> tarafından tasarlanan ve üretilen, ağa bağlı bir masaüstü bilgi ekranıdır. Bankalar, aracı kurumlar ve döviz şirketleri tarafından müşterilerine markalı bir cihaz olarak verilmek üzere geliştirilmiştir. Bu doküman; cihazın donanımını, sistem mimarisini, sunduğu servisleri, ağ topolojisini ve güvenlik önlemlerini kurumsal BT ve bilgi güvenliği ekipleri için özetler.</p>
+    <p class="lede" lang="en">ePiXeL is a networked desktop information display designed and manufactured by <strong>HCT Bilişim</strong>. It is built for banks, brokerage houses and foreign-exchange firms to place with their clients as a branded device. This document summarises the hardware, the system architecture, the services it provides, its network topology and its security posture for corporate IT and information-security teams.</p>
+
+    <div class="meta">
+      <span lang="tr"><b>Üretici</b> &nbsp;HCT Bilişim</span>
+      <span lang="en"><b>Manufacturer</b> &nbsp;HCT Bilişim</span>
+      <span lang="tr"><b>Marka</b> &nbsp;ePiXeL</span>
+      <span lang="en"><b>Brand</b> &nbsp;ePiXeL</span>
+      <span lang="tr"><b>Durum</b> &nbsp;Seri üretimde</span>
+      <span lang="en"><b>Status</b> &nbsp;In series production</span>
+      <span lang="tr"><b>Diller</b> &nbsp;Türkçe · İngilizce</span>
+      <span lang="en"><b>Languages</b> &nbsp;Turkish · English</span>
+      <span lang="tr"><b>Ürün sayfası</b> &nbsp;<a href="https://epixel.app/en/products/epixel-ekran">epixel.app</a></span>
+      <span lang="en"><b>Product page</b> &nbsp;<a href="https://epixel.app/en/products/epixel-ekran">epixel.app</a></span>
+    </div>
+  </div>
+
+  <div class="highlights">
+    <p class="hl-lead" lang="tr">ePiXeL bir slayt gösterisi değil. Fiyatlar cihaza <strong>itilir</strong> — cihaz sunucuyu belirli aralıklarla yoklamaz, kalıcı bir mesaj kanalı üzerinden değişimi olduğu anda alır. Kullanıcı ne göreceğini kendisi seçer, kurum ne gösterileceğini yönetir, ve cihaz zayıf hatta da elektrik kesintisinden sonra da kendi başına ayağa kalkar.</p>
+    <p class="hl-lead" lang="en">ePiXeL is not a slideshow. Prices are <strong>pushed</strong> to the device — it does not poll a server on a timer; changes arrive over a persistent message channel the moment they happen. The user picks what to see, the institution controls what may be shown, and the device brings itself back up on a weak link or after a power cut.</p>
+
+    <div class="hl-grid">
+
+      <div class="hl">
+        <span class="cat" lang="tr">Piyasa verisi</span>
+        <span class="cat" lang="en">Market data</span>
+        <h5 lang="tr">7.000'den fazla sembol, tek ekranda</h5>
+        <h5 lang="en">More than 7,000 symbols on one screen</h5>
+        <p lang="tr">Kripto, döviz, Borsa İstanbul, küresel endeksler ve fark sözleşmeleri aynı cihazda. Hisselerde emir defteri derinliği, şirketlerde son bilanço, takvimde açıklanacak veriler. Kullanıcı ayrı ayrı uygulama açmaz.</p>
+        <p lang="en">Cryptocurrencies, foreign exchange, Borsa İstanbul, global indices and CFDs on the same unit. Order-book depth on equities, the latest balance sheet on companies, upcoming releases on the calendar. No app switching.</p>
+      </div>
+
+      <div class="hl">
+        <span class="cat" lang="tr">Kişiselleştirme</span>
+        <span class="cat" lang="en">Personalisation</span>
+        <h5 lang="tr">Kullanıcı kendi sayfasını kurar</h5>
+        <h5 lang="en">The user builds their own page</h5>
+        <p lang="tr">Takip etmek istediği sembolleri seçip kendi sayfasını oluşturur. Hangi sayfaların açık olacağını, hangi sırayla döneceğini ve <strong>her sayfanın ekranda kaç saniye kalacağını</strong> kendisi belirler. Sabit bir içerik akışı dayatılmaz.</p>
+        <p lang="en">They pick the symbols they care about and compose their own page. Which pages are enabled, the order they rotate in, and <strong>how long each one stays on screen</strong> are all theirs to set. No fixed content loop is imposed.</p>
+      </div>
+
+      <div class="hl">
+        <span class="cat" lang="tr">Uyarılar</span>
+        <span class="cat" lang="en">Alerts</span>
+        <h5 lang="tr">Fiyat hedefe gelince cihaz seslenir</h5>
+        <h5 lang="en">The device speaks up when a price arrives</h5>
+        <p lang="tr">Sembol başına eşik ve koşul kurulur; hedefe ulaşıldığında cihaz sesli ve görsel olarak uyarır. Kullanıcının ekrana bakıyor olması ya da telefonunu kontrol etmesi gerekmez.</p>
+        <p lang="en">Per-symbol thresholds and conditions; when the level is reached the device raises an audible and visual alert. The user does not have to be watching the screen, or checking a phone.</p>
+      </div>
+
+      <div class="hl">
+        <span class="cat" lang="tr">Kapsam</span>
+        <span class="cat" lang="en">Breadth</span>
+        <h5 lang="tr">Tek cihazda beş ayrı kanal</h5>
+        <h5 lang="en">Five channels in one device</h5>
+        <p lang="tr">Piyasa verisi · yüzlerce internet radyosu · cihazdan cihaza telsiz · sesli asistan · akıllı ev bağlantısı. Bu bileşim, bu sınıftaki cihazlarda alışılmış değildir; hepsi aynı ses ve ekran kaynağını sıraya sokan tek bir hakem üzerinden yönetilir.</p>
+        <p lang="en">Market data · hundreds of internet radio stations · device-to-device intercom · a voice assistant · a smart-home link. That combination is unusual in this class, and all of it is arbitrated through one component that decides who gets the speaker and the screen.</p>
+      </div>
+
+      <div class="hl">
+        <span class="cat" lang="tr">Kurumsal kanal</span>
+        <span class="cat" lang="en">Institutional channel</span>
+        <h5 lang="tr">Müşterinin masasına açılan bir yol</h5>
+        <h5 lang="en">A path to the client's desk</h5>
+        <p lang="tr">Panelden anket ve soru gönderilir, yanıtlar toplanır; görsel ve ses dosyası tek bir cihaza ya da tüm filoya iletilir. Kasa ve açılış ekranı kurum markasıyla üretilir. Cihaz gün boyu kurumun adını müşterinin önünde tutar.</p>
+        <p lang="en">Surveys and questions go out from the panel and answers come back; images and audio reach one device or the whole fleet. The shell and the boot screen carry the institution's brand. The unit keeps that name in front of the client all day.</p>
+      </div>
+
+      <div class="hl">
+        <span class="cat" lang="tr">Altyapı</span>
+        <span class="cat" lang="en">Infrastructure</span>
+        <h5 lang="tr">Sahada ayakta kalacak şekilde yazıldı</h5>
+        <h5 lang="en">Written to survive the field</h5>
+        <p lang="tr">İmzalı güncelleme ve başarısız sürümden otomatik dönüş; zayıf hatlar için ölçülmüş zaman aşımları; elektrik kesintisinden sonra kullanıcıya hiçbir şey sordurmadan geri gelme. Veri gelmediğinde cihaz <strong>uydurma değer göstermez</strong> — son bilinen değeri yaşıyla birlikte söyler.</p>
+        <p lang="en">Signed updates with automatic return from a bad version; timeout budgets measured for weak links; recovery after a power cut without asking the user anything. When data stops arriving the device <strong>never invents a value</strong> — it shows the last known one together with its age.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="doc">
+
+    <nav class="toc" aria-label="Contents">
+      <ol>
+        <li><a href="#hw"><i>01</i><span lang="tr">Donanım</span><span lang="en">Hardware</span></a></li>
+        <li><a href="#arch"><i>02</i><span lang="tr">Mimari</span><span lang="en">Architecture</span></a></li>
+        <li><a href="#svc"><i>03</i><span lang="tr">Servisler</span><span lang="en">Services</span></a></li>
+        <li><a href="#net"><i>04</i><span lang="tr">Ağ Topolojisi</span><span lang="en">Network</span></a></li>
+        <li><a href="#ha"><i>05</i><span lang="tr">Home Assistant</span><span lang="en">Home Assistant</span></a></li>
+        <li><a href="#sec"><i>06</i><span lang="tr">Güvenlik</span><span lang="en">Security</span></a></li>
+        <li><a href="#ops"><i>07</i><span lang="tr">İşletim Modeli</span><span lang="en">Operating Model</span></a></li>
+      </ol>
+    </nav>
+
+    <main>
+
+      <!-- ═══════════════ 01 HARDWARE ═══════════════ -->
+      <section id="hw">
+        <div class="sec-head">
+          <span class="sec-num">§ 01</span>
+          <h2 lang="tr">Donanım</h2>
+          <h2 lang="en">Hardware</h2>
+        </div>
+
+        <p lang="tr">Cihaz, dikey kullanım için tasarlanmış dört inçlik dokunmatik bir panel, hoparlör ve mikrofon taşır. Masaüstü ayak ya da duvar montajı ile kullanılabilir. Kasa, kurum markasına göre özelleştirilir.</p>
+        <p lang="en">The unit carries a four-inch touch panel in portrait orientation, a speaker and a microphone. It ships with a desk stand and supports wall mounting. The shell is customised to the client's brand.</p>
+
+        <div class="tbl-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th><span lang="tr">Bileşen</span><span lang="en">Component</span></th>
+                <th><span lang="tr">Özellik</span><span lang="en">Specification</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span lang="tr">İşlemci</span><span lang="en">Processor</span></td>
+                <td>ESP32</td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Ekran</span><span lang="en">Display</span></td>
+                <td><span class="mono">4"</span> IPS · <span class="mono">320 × 480</span> ·
+                  <span lang="tr">dikey · RGB565 · SPI arayüz</span><span lang="en">portrait · RGB565 · SPI interface</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Dokunmatik</span><span lang="en">Touch</span></td>
+                <td><span lang="tr">Kapasitif çoklu dokunma paneli, I²C arayüz, donanımsal kesme hattı</span><span lang="en">Capacitive multi-touch panel, I²C interface, hardware interrupt line</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Ses çıkışı</span><span lang="en">Audio out</span></td>
+                <td><span lang="tr">I²S dijital ses, D-sınıfı yükselteç ve entegre hoparlör; yazılımdan sessize alma hattı</span><span lang="en">I²S digital audio into a class-D amplifier and integrated speaker; software mute line</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Ses girişi</span><span lang="en">Audio in</span></td>
+                <td><span lang="tr">I²S dijital MEMS mikrofon; yalnızca kullanıcı başlattığında etkinleşir</span><span lang="en">I²S digital MEMS microphone; enabled only on user action</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Ağ</span><span lang="en">Network</span></td>
+                <td><span class="mono">2.4 GHz</span> Wi-Fi · 802.11 b/g/n ·
+                  <span lang="tr">WPA2 / WPA3 kurumsal ağ uyumlu</span><span lang="en">WPA2 / WPA3 compatible</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Depolama</span><span lang="en">Storage</span></td>
+                <td><span lang="tr">Dahili flash; ayrılmış şifreli kimlik bilgisi alanı ve çift bölümlü güncelleme yerleşimi</span><span lang="en">Internal flash with a dedicated encrypted credential store and a dual-slot update layout</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Montaj</span><span lang="en">Mounting</span></td>
+                <td><span lang="tr">Masa ayağı veya duvar aparatı</span><span lang="en">Desk stand or wall bracket</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          <p lang="tr">Mekanik ölçüler, güç tüketimi, sertifikasyon dosyaları ve markalama seçenekleri talep üzerine ayrı bir donanım veri sayfasıyla paylaşılır.</p>
+          <p lang="en">Mechanical dimensions, power figures, certification files and branding options are supplied on request in a separate hardware datasheet.</p>
+        </div>
+      </section>
+
+      <!-- ═══════════════ 02 ARCHITECTURE ═══════════════ -->
+      <section id="arch">
+        <div class="sec-head">
+          <span class="sec-num">§ 02</span>
+          <h2 lang="tr">Sistem Mimarisi</h2>
+          <h2 lang="en">System Architecture</h2>
+        </div>
+
+        <p lang="tr">Sistem dört düzlemden oluşur. Cihaz yazılımı gerçek zamanlı çalışır ve arayüzü tek bir görev üzerinde çizer; veri, mesajlaşma ve güncelleme akışları ayrı görevlerde yürütülür. Platform tarafı piyasa verisini toplar, filoyla mesajlaşır ve imzalı güncellemeleri dağıtır. Yönetim paneli kurumun cihaz filosunu ve içeriğini yönettiği yüzdür. Entegrasyon düzlemi ise cihazı müşterinin kendi yerel sistemlerine bağlar.</p>
+        <p lang="en">The system has four planes. Device firmware runs in real time, drawing the interface on a dedicated task while data, messaging and update work proceed on separate ones. The platform ingests market data, exchanges messages with the fleet and distributes signed updates. The management panel is where an institution runs its fleet and its content. The integration plane connects the device to the customer's own local systems.</p>
+
+        <p lang="tr">Veri akışının yönü tasarımın belirleyici kararıdır: cihaz sunucuyu <strong>yoklamaz</strong>. Kalıcı bir mesaj kanalına abone olur ve yalnızca <em>değişen</em> değeri alır. Bunun üç sonucu var — fiyat gecikmesi kullanıcının fark edeceği düzeyde olmaz, sabit periyotlu istek yükü ortadan kalkar, ve bir sembol hareket etmiyorsa hiç trafik üretilmez. Aynı kanal komutları, içerik gönderimlerini ve telsiz sinyalizasyonunu da taşır; cihazda ikinci bir bağlantı yönetimi bulunmaz.</p>
+        <p lang="en">The direction of data flow is the defining decision here: the device does <strong>not poll</strong>. It subscribes to a persistent message channel and receives only what <em>changed</em>. Three things follow — price latency never reaches a level the user notices, the fixed-interval request load disappears, and a symbol that is not moving generates no traffic at all. The same channel carries commands, content deliveries and intercom signalling, so there is no second connection to manage on the device.</p>
+
+        <p lang="tr">Katmanlar arası bağımlılık <strong>tek yönlüdür</strong> ve bu kural derleme sırasında denetlenir; alt katman üst katmanı çağıramaz. Paylaşılan kaynaklar sıralı kilitlerle korunur ve kilit sırası çalışma anında izlenir, ihlal sayılır ve panele raporlanır. Bu, "çalışıyor gibi görünüp haftada bir kilitlenen" cihaz sınıfından kaçınmak için ödenmiş bir bedeldir.</p>
+        <p lang="en">Dependencies between layers are <strong>strictly one-way</strong>, and that rule is enforced at build time — a lower layer cannot call an upper one. Shared resources are protected by ordered locks, and the ordering is monitored at run time, counted on violation and reported to the panel. This is the price paid to avoid the class of device that appears to work and then locks up once a week.</p>
+
+        <div class="cards">
+          <div class="card">
+            <h5 lang="tr">Cihaz yazılımı</h5>
+            <h5 lang="en">Device firmware</h5>
+            <p lang="tr">Yerel gerçek zamanlı işletim sistemi üzerinde, katmanlı ve tek yönlü bağımlılığa sahip bir yapı. Arayüz, ağ, ses ve sensör işleri ayrı görevlerde; paylaşılan kaynaklar sıralı kilitlerle korunur.</p>
+            <p lang="en">A layered, strictly one-way dependency structure on a native real-time operating system. Interface, network, audio and sensor work run on separate tasks; shared resources are protected by ordered locks.</p>
+          </div>
+          <div class="card">
+            <h5 lang="tr">Platform servisleri</h5>
+            <h5 lang="en">Platform services</h5>
+            <p lang="tr">Piyasa verisi toplama ve dağıtımı, mesaj aracısı, medya ve varlık dağıtımı, güncelleme yayını, filo telemetrisi ve lisanslama.</p>
+            <p lang="en">Market-data ingestion and distribution, message broker, media and asset delivery, update publication, fleet telemetry and licensing.</p>
+          </div>
+          <div class="card">
+            <h5 lang="tr">Yönetim paneli</h5>
+            <h5 lang="en">Management panel</h5>
+            <p lang="tr">Cihaz kaydı, sayfa ve içerik yetkilendirme, kampanya ve anket gönderimi, uzaktan yapılandırma, güncelleme dağıtımı ve filo sağlığı.</p>
+            <p lang="en">Device enrolment, page and content entitlement, campaign and survey delivery, remote configuration, update rollout and fleet health.</p>
+          </div>
+          <div class="card">
+            <h5 lang="tr">Entegrasyon düzlemi</h5>
+            <h5 lang="en">Integration plane</h5>
+            <p lang="tr">Müşterinin yerel sistemleriyle bağlantı. Bugün Home Assistant entegrasyonu bu düzlemde çalışır ve tamamen yerel ağda kalır.</p>
+            <p lang="en">Connections to the customer's local systems. The Home Assistant integration lives here today and stays entirely on the local network.</p>
+          </div>
+        </div>
+
+        <h4 lang="tr">Düzlemler arası akış</h4>
+        <h4 lang="en">Flow between planes</h4>
+
+        <div class="diagram">
+          <div class="zone">
+            <div class="zone-label" lang="tr">Müşteri sahası — şube, ofis veya konut</div>
+            <div class="zone-label" lang="en">Customer site — branch, office or home</div>
+            <div class="row">
+              <div class="node key">
+                <b>ePiXeL</b>
+                <span lang="tr">bilgi ekranı</span><span lang="en">information display</span>
+              </div>
+              <div class="link">
+                <span>Wi-Fi</span><i></i><span lang="tr">yerel</span><span lang="en">local</span>
+              </div>
+              <div class="node">
+                <b lang="tr">Yönlendirici / güvenlik duvarı</b>
+                <b lang="en">Router / firewall</b>
+                <span lang="tr">NAT arkası, giden trafik</span><span lang="en">behind NAT, outbound only</span>
+              </div>
+              <div class="link">
+                <span lang="tr">yerel</span><span lang="en">local</span><i></i><span>HTTP</span>
+              </div>
+              <div class="node">
+                <b>Home Assistant</b>
+                <span lang="tr">isteğe bağlı, yerel</span><span lang="en">optional, local</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="vlink">
+            <i></i>
+            <span lang="tr">TLS · yalnızca giden bağlantı · gelen port yok</span>
+            <span lang="en">TLS · outbound connections only · no inbound port</span>
+            <i></i>
+          </div>
+
+          <div class="zone platform">
+            <div class="zone-label" lang="tr">ePiXeL platformu</div>
+            <div class="zone-label" lang="en">ePiXeL platform</div>
+            <div class="row">
+              <div class="node">
+                <b lang="tr">Piyasa verisi</b><b lang="en">Market data</b>
+                <span lang="tr">toplama ve dağıtım</span><span lang="en">ingestion and fan-out</span>
+              </div>
+              <div class="link"><i></i></div>
+              <div class="node">
+                <b lang="tr">Mesajlaşma</b><b lang="en">Messaging</b>
+                <span lang="tr">komut, içerik, telsiz</span><span lang="en">commands, content, intercom</span>
+              </div>
+              <div class="link"><i></i></div>
+              <div class="node">
+                <b lang="tr">Güncelleme</b><b lang="en">Updates</b>
+                <span lang="tr">imzalı dağıtım</span><span lang="en">signed distribution</span>
+              </div>
+              <div class="link"><i></i></div>
+              <div class="node">
+                <b lang="tr">Yönetim paneli</b><b lang="en">Panel</b>
+                <span lang="tr">filo ve içerik</span><span lang="en">fleet and content</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════ 03 SERVICES ═══════════════ -->
+      <section id="svc">
+        <div class="sec-head">
+          <span class="sec-num">§ 03</span>
+          <h2 lang="tr">Servisler</h2>
+          <h2 lang="en">Services</h2>
+        </div>
+
+        <p lang="tr">Cihazın sunduğu servisler yedi başlıkta toplanır. Hangi sayfaların açık olacağı ve her sayfanın ekranda ne kadar kalacağı panelden ve cihaz üzerinden yapılandırılabilir.</p>
+        <p lang="en">The device's services fall into seven groups. Which pages are enabled, and how long each page stays on screen, is configurable from the panel and on the device itself.</p>
+
+        <h3 lang="tr">Piyasa verisi</h3>
+        <h3 lang="en">Market data</h3>
+        <ul class="list">
+          <li lang="tr"><strong>7.000'den fazla enstrümanda canlı fiyat</strong> — kripto para, döviz ve Borsa İstanbul</li>
+          <li lang="en"><strong>Live prices across more than 7,000 instruments</strong> — cryptocurrencies, foreign exchange and Borsa İstanbul</li>
+          <li lang="tr"><strong>Borsa İstanbul</strong> — hisseler, yükselenler, düşenler, işlem hacmi ve emir defteri derinliği</li>
+          <li lang="en"><strong>Borsa İstanbul</strong> — equities, gainers, losers, traded volume and order-book depth</li>
+          <li lang="tr"><strong>Küresel endeksler, döviz pariteleri ve fark sözleşmeleri</strong></li>
+          <li lang="en"><strong>Global indices, currency pairs and contracts for difference</strong></li>
+          <li lang="tr"><strong>Kripto para</strong> — tam sembol kapsamı ile günlük en çok yükselen ve düşenler</li>
+          <li lang="en"><strong>Cryptocurrencies</strong> — full symbol coverage plus daily top gainers and losers</li>
+          <li lang="tr"><strong>Bilançolar</strong> — halka açık şirketlerin son yayımlanan finansal tabloları</li>
+          <li lang="en"><strong>Balance sheets</strong> — the latest published financial statements of listed companies</li>
+          <li lang="tr"><strong>Ekonomik takvim</strong> — çok ülkeli veri açıklama takvimi, önem derecesine göre süzülür</li>
+          <li lang="en"><strong>Economic calendar</strong> — multi-country release schedule, filtered by importance</li>
+          <li lang="tr"><strong>Fiyat alarmları</strong> — sembol başına eşik ve koşul; cihazda sesli ve görsel uyarı</li>
+          <li lang="en"><strong>Price alarms</strong> — per-symbol thresholds and conditions, raised on the device with sound and a visual alert</li>
+          <li lang="tr"><strong>Sembol kartı</strong> — takip edilen herhangi bir enstrüman anlık olarak açılabilir</li>
+          <li lang="en"><strong>Symbol card</strong> — any tracked instrument can be pulled up on demand</li>
+        </ul>
+
+        <h3 lang="tr">Kişiselleştirme</h3>
+        <h3 lang="en">Personalisation</h3>
+        <p lang="tr">Cihazın içeriği sabit değildir. Kullanıcı hem <em>neyi</em> hem <em>ne kadar süre</em> göreceğine karar verir; kurum ise bu seçimin sınırlarını panelden belirler.</p>
+        <p lang="en">The content is not fixed. The user decides both <em>what</em> they see and <em>for how long</em>; the institution sets the boundaries of that choice from the panel.</p>
+        <ul class="list">
+          <li lang="tr"><strong>Özel sayfa</strong> — kullanıcı takip etmek istediği sembolleri seçip kendi sayfasını oluşturur. Birden fazla özel sayfa kurulabilir; seçimler cihazda kalıcı olarak saklanır</li>
+          <li lang="en"><strong>Custom pages</strong> — the user picks the symbols they want to follow and composes their own page. More than one can be created, and the choices are stored permanently on the device</li>
+          <li lang="tr"><strong>Sayfa süresi</strong> — her sayfanın ekranda kaç saniye kalacağı ayrı ayrı ayarlanır; hızlı bakılan bir sayfa kısa, okunan bir sayfa uzun tutulabilir</li>
+          <li lang="en"><strong>Dwell time</strong> — how many seconds each page stays on screen is set individually; a page that is glanced at can be short, one that is read can be long</li>
+          <li lang="tr"><strong>Sayfa açma ve kapatma</strong> — ilgilenmediği başlıkları tamamen kapatır; akış yalnızca istediklerinden oluşur</li>
+          <li lang="en"><strong>Enable and disable</strong> — anything they do not care about is switched off entirely; the rotation contains only what they chose</li>
+          <li lang="tr"><strong>Sabitleme</strong> — bir sayfa akıştan çıkarılıp ekranda sabit tutulabilir</li>
+          <li lang="en"><strong>Pinning</strong> — a page can be taken out of the rotation and held on screen</li>
+          <li lang="tr"><strong>Görünüm ve dil</strong> — parlaklık (gündüz/gece programlı), ses düzeyi ve arayüz dili cihazdan ya da uzaktan değiştirilir</li>
+          <li lang="en"><strong>Appearance and language</strong> — brightness (with a day/night schedule), volume and interface language change on the device or remotely</li>
+          <li lang="tr"><strong>Marka</strong> — kasa, açılış ekranı ve üst bant kurum kimliğiyle üretilir</li>
+          <li lang="en"><strong>Branding</strong> — the shell, the boot screen and the header carry the institution's identity</li>
+        </ul>
+
+        <h3 lang="tr">Bilgi ve içerik</h3>
+        <h3 lang="en">Information and content</h3>
+        <ul class="list">
+          <li lang="tr"><strong>Haberler</strong> — birden fazla kaynaktan, sürekli tazelenen akış</li>
+          <li lang="en"><strong>News</strong> — a continuously refreshed feed from multiple sources</li>
+          <li lang="tr"><strong>Hava durumu</strong> — şehir bazlı, kullanıcı tarafından seçilir</li>
+          <li lang="en"><strong>Weather</strong> — by city, selected by the user</li>
+          <li lang="tr"><strong>Namaz vakitleri</strong> — şehir bazlı, isteğe bağlı sesli uyarı ile</li>
+          <li lang="en"><strong>Prayer times</strong> — by city, with an optional audible alert</li>
+          <li lang="tr"><strong>Burçlar</strong> ve <strong>gündem başlıkları</strong></li>
+          <li lang="en"><strong>Horoscopes</strong> and <strong>trending topics</strong></li>
+        </ul>
+
+        <h3 lang="tr">Kişisel araçlar</h3>
+        <h3 lang="en">Personal tools</h3>
+        <ul class="list">
+          <li lang="tr"><strong>Takvim</strong> — cihaz üzerinde etkinlik oluşturma ve düzenleme, platformla çift yönlü eşitleme</li>
+          <li lang="en"><strong>Calendar</strong> — create and edit events on the device, synchronised both ways with the platform</li>
+          <li lang="tr"><strong>Hatırlatmalar</strong> ve <strong>notlar</strong></li>
+          <li lang="en"><strong>Reminders</strong> and <strong>notes</strong></li>
+          <li lang="tr"><strong>Günlük ve tekrarlı alarmlar</strong></li>
+          <li lang="en"><strong>Daily and recurring alarms</strong></li>
+          <li lang="tr"><strong>Hesap makinesi</strong></li>
+          <li lang="en"><strong>Calculator</strong></li>
+        </ul>
+
+        <h3 lang="tr">İletişim</h3>
+        <h3 lang="en">Communication</h3>
+        <ul class="list">
+          <li lang="tr"><strong>Cihazdan cihaza telsiz.</strong> Ünitelere bas-konuş yöntemiyle karşılıklı görüşme: adlandırılmış odalar, davet, arkadaş listesi ve moderasyon. Ses akışı oda bazlı anahtarlarla şifrelenir; sunucu akışı yalnızca yönlendirir.</li>
+          <li lang="en"><strong>Device-to-device intercom.</strong> Units talk push-to-talk: named rooms, invitations, buddy lists and moderation. Audio is encrypted with per-room keys; the server relays without opening the stream.</li>
+          <li lang="tr"><strong>Sesli asistan.</strong> Uyandırma sözcüğü ile devreye girer, sesli yanıt verir ve cihazı yönetir — sayfa açma, alarm kurma, hatırlatma ekleme, radyo başlatma.</li>
+          <li lang="en"><strong>Voice assistant.</strong> Wake-word activation, spoken replies and control of the device itself — open a page, set an alarm, add a reminder, start the radio.</li>
+        </ul>
+
+        <h3 lang="tr">Medya</h3>
+        <h3 lang="en">Media</h3>
+        <ul class="list">
+          <li lang="tr"><strong>İnternet radyosu</strong> — yüzlerce istasyon</li>
+          <li lang="en"><strong>Internet radio</strong> — hundreds of stations</li>
+          <li lang="tr"><strong>Fotoğraf albümü</strong> — kullanıcı ekrandaki QR kodu telefonuyla okutur, kendi fotoğraflarını yükler ve cihaz bunları albüm olarak gösterir</li>
+          <li lang="en"><strong>Photo album</strong> — the user scans a QR code on the screen with their phone, uploads their own photos, and the display shows them as an album</li>
+          <li lang="tr"><strong>Gönderilen medya</strong> — kurum tek bir cihaza ya da tüm filoya görsel veya ses dosyası iletebilir</li>
+          <li lang="en"><strong>Pushed media</strong> — the institution can deliver an image or an audio file to a single device or the whole fleet</li>
+        </ul>
+
+        <h3 lang="tr">Yönetim ve iletişim kanalı</h3>
+        <h3 lang="en">Management and outreach</h3>
+        <ul class="list">
+          <li lang="tr"><strong>Anket ve sorular</strong> — cihazlara gönderilir, yanıtlar panelde toplanır</li>
+          <li lang="en"><strong>Surveys and questions</strong> — pushed to devices, with answers collected back in the panel</li>
+          <li lang="tr"><strong>Sayfa yetkilendirme</strong> — hangi cihazın hangi sayfaları göreceği kurum tarafından belirlenir</li>
+          <li lang="en"><strong>Page entitlement</strong> — the institution decides which device may show which pages</li>
+          <li lang="tr"><strong>Sayfa süreleri</strong> — her sayfanın ekranda ne kadar kalacağı ayrı ayrı seçilir</li>
+          <li lang="en"><strong>Page dwell time</strong> — how long each page stays on screen is chosen individually</li>
+          <li lang="tr"><strong>Uzaktan yapılandırma</strong> — parlaklık, ses, dil ve sayfa düzeni</li>
+          <li lang="en"><strong>Remote configuration</strong> — brightness, volume, language and page layout</li>
+          <li lang="tr"><strong>Filo sağlığı</strong> — bağlantı, bellek, çalışma süresi ve arıza telemetrisi</li>
+          <li lang="en"><strong>Fleet health</strong> — connectivity, memory, uptime and fault telemetry</li>
+        </ul>
+
+        <h3 lang="tr">Akıllı ev</h3>
+        <h3 lang="en">Smart home</h3>
+        <ul class="list">
+          <li lang="tr"><strong>Home Assistant entegrasyonu</strong> — aşağıda ayrı bölümde ele alınmıştır</li>
+          <li lang="en"><strong>Home Assistant integration</strong> — covered in its own section below</li>
+        </ul>
+      </section>
+
+      <!-- ═══════════════ 04 NETWORK ═══════════════ -->
+      <section id="net">
+        <div class="sec-head">
+          <span class="sec-num">§ 04</span>
+          <h2 lang="tr">Ağ Topolojisi</h2>
+          <h2 lang="en">Network Topology</h2>
+        </div>
+
+        <p lang="tr">Cihaz ağa yalnızca <strong>istemci</strong> olarak katılır. Tüm bağlantıları kendisi başlatır; dışarıdan erişilebilen hiçbir servis, port ya da uzak kabuk barındırmaz. Bu nedenle NAT arkasında, misafir ağında veya ayrılmış bir IoT VLAN'ında sorunsuz çalışır ve güvenlik duvarında port yönlendirme kuralı gerektirmez.</p>
+        <p lang="en">The device joins the network purely as a <strong>client</strong>. It initiates every connection and hosts no externally reachable service, port or remote shell. It therefore works behind NAT, on a guest network or on a dedicated IoT VLAN, and needs no port-forwarding rule on the firewall.</p>
+
+        <h4 lang="tr">Giden trafik — güvenlik duvarında izin verilmesi gerekenler</h4>
+        <h4 lang="en">Outbound traffic — what to allow on the firewall</h4>
+
+        <div class="tbl-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th><span lang="tr">Amaç</span><span lang="en">Purpose</span></th>
+                <th><span lang="tr">Protokol</span><span lang="en">Protocol</span></th>
+                <th><span lang="tr">Yön</span><span lang="en">Direction</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span lang="tr">Piyasa verisi, komut ve içerik</span><span lang="en">Market data, commands and content</span></td>
+                <td class="num">MQTT / TLS · 8883</td>
+                <td><span lang="tr">giden</span><span lang="en">outbound</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Kayıt, medya, güncelleme indirme</span><span lang="en">Enrolment, media, update download</span></td>
+                <td class="num">HTTPS · 443</td>
+                <td><span lang="tr">giden</span><span lang="en">outbound</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Saat eşitleme</span><span lang="en">Time synchronisation</span></td>
+                <td class="num">NTP · 123 · HTTPS · 443</td>
+                <td><span lang="tr">giden</span><span lang="en">outbound</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Ad çözümleme</span><span lang="en">Name resolution</span></td>
+                <td class="num">DNS · 53</td>
+                <td><span lang="tr">giden</span><span lang="en">outbound</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Telsiz ses akışı</span><span lang="en">Intercom audio</span></td>
+                <td><span lang="tr">UDP, oturum kurulumunda anlaşılır</span><span lang="en">UDP, negotiated at session setup</span></td>
+                <td><span lang="tr">giden</span><span lang="en">outbound</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Home Assistant (isteğe bağlı)</span><span lang="en">Home Assistant (optional)</span></td>
+                <td><span lang="tr">HTTP — <strong>yalnızca yerel ağ</strong></span><span lang="en">HTTP — <strong>local network only</strong></span></td>
+                <td><span lang="tr">yerel, giden</span><span lang="en">local, outbound</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          <p lang="tr"><strong>Gelen bağlantı gerekmez.</strong> Filo yönetimi, uzaktan komut ve güncelleme dağıtımı dahil olmak üzere her işlem, cihazın kendi başlattığı giden oturumlar üzerinden yürür. Kurumsal ağda cihaza dışarıdan erişilebilir bir yüzey açılmaz.</p>
+          <p lang="en"><strong>No inbound connection is required.</strong> Everything — fleet management, remote commands and update delivery — travels over sessions the device itself opens. No externally reachable surface is created on the corporate network.</p>
+        </div>
+
+        <h4 lang="tr">Ağ dayanıklılığı</h4>
+        <h4 lang="en">Network resilience</h4>
+        <ul class="list">
+          <li lang="tr">Bağlantı koptuğunda cihaz son bilinen veriyi yaşıyla birlikte göstermeye devam eder; uydurma değer üretmez</li>
+          <li lang="en">On a dropped connection the device keeps showing the last known data together with its age; it never invents a value</li>
+          <li lang="tr">Yeniden bağlanma, ağı boğmamak için kademeli ve dağıtılmış gecikmelerle yapılır</li>
+          <li lang="en">Reconnection uses staggered, backed-off delays so a fleet cannot stampede the network</li>
+          <li lang="tr">Elektrik kesintisi sonrası modem geç açılsa dahi cihaz kurulum ekranına düşmez, arka planda beklemeye devam eder</li>
+          <li lang="en">After a power cut, a slow-booting router does not push the device into a setup screen; it keeps retrying in the background</li>
+          <li lang="tr">Zayıf veya değişken hatlarda çalışacak şekilde ölçülmüş zaman aşımı ve yeniden deneme bütçeleriyle tasarlanmıştır</li>
+          <li lang="en">Timeout and retry budgets are measured for weak or variable links</li>
+        </ul>
+      </section>
+
+      <!-- ═══════════════ 05 HOME ASSISTANT ═══════════════ -->
+      <section id="ha">
+        <div class="sec-head">
+          <span class="sec-num">§ 05</span>
+          <h2 lang="tr">Home Assistant Eklentisi</h2>
+          <h2 lang="en">Home Assistant Integration</h2>
+        </div>
+
+        <p lang="tr">ePiXeL, kullanıcının kendi Home Assistant kurulumundaki ışıkları, prizleri ve sensörleri ekranda gösterebilir; dokunarak açıp kapatabilir ve sayısal sensörlerin son yirmi dört saatlik grafiğini çizebilir. Entegrasyon <strong>açık kaynaktır</strong> ve HACS üzerinden kurulur.</p>
+        <p lang="en">ePiXeL can display the lights, sockets and sensors from the user's own Home Assistant installation, toggle them by touch, and chart the last twenty-four hours of any numeric sensor. The integration is <strong>open source</strong> and installs through HACS.</p>
+
+        <div class="cards">
+          <div class="card">
+            <h5 lang="tr">Tamamen yerel</h5>
+            <h5 lang="en">Entirely local</h5>
+            <p lang="tr">Tüm trafik ev veya ofis ağında kalır. Bu özellikte bulut bileşeni yoktur; ePiXeL sunucuları devrede değildir.</p>
+            <p lang="en">All traffic stays on the local network. This feature has no cloud component; ePiXeL servers are not involved.</p>
+          </div>
+          <div class="card">
+            <h5 lang="tr">Cihaz başlatır</h5>
+            <h5 lang="en">Device initiated</h5>
+            <p lang="tr">Bağlantıyı her zaman ekran kurar. Home Assistant cihaza bağlanmaz, cihazda dinleyen port açılmaz.</p>
+            <p lang="en">The display always opens the connection. Home Assistant never connects to the device, and no listening port is opened on it.</p>
+          </div>
+          <div class="card">
+            <h5 lang="tr">Dört haneli eşleşme</h5>
+            <h5 lang="en">Four-digit pairing</h5>
+            <p lang="tr">Ekranda görünen kod, Home Assistant arayüzünde onaylanır. Üç dakikalık pencere, beş deneme ve üç eşzamanlı istek sınırı birlikte çalışır.</p>
+            <p lang="en">A code shown on the screen is confirmed in the Home Assistant interface. A three-minute window, five attempts and three concurrent requests apply together.</p>
+          </div>
+          <div class="card">
+            <h5 lang="tr">En az yetki</h5>
+            <h5 lang="en">Least privilege</h5>
+            <p lang="tr">Ekran yalnızca kullanıcının seçtiği varlıkları görür — evin geri kalanını değil. Erişim tek tıkla iptal edilir.</p>
+            <p lang="en">The display sees only the entities the user selected — not the rest of the home. Access is revoked in one click.</p>
+          </div>
+        </div>
+
+        <h4 lang="tr">Kullanım</h4>
+        <h4 lang="en">How it is used</h4>
+        <ul class="list">
+          <li lang="tr">Kullanıcı sayfaları <strong>Home Assistant arayüzünde</strong> kurar: bir başlık verir ve varlıkları seçer. Sayfa başına iki, dört veya altı kutu; en fazla sekiz sayfa.</li>
+          <li lang="en">The user builds pages <strong>in the Home Assistant interface</strong>: a title and a set of entities. Two, four or six boxes per page; up to eight pages.</li>
+          <li lang="tr">Düzen seçilen varlık sayısından türetilir — ayrıca yerleşim ayarı yapılmaz.</li>
+          <li lang="en">The layout follows from how many entities are chosen — there is no separate layout setting.</li>
+          <li lang="tr">Değişiklikler kaydedildiği anda ekrana ulaşır; sensör değerleri değiştiği anda güncellenir.</li>
+          <li lang="en">Changes reach the screen the moment they are saved; sensor values update the moment they change.</li>
+          <li lang="tr">Home Assistant sayfaları cihazın sayfa akışına katılır ve diğer sayfalarla aynı sırada gösterilir.</li>
+          <li lang="en">Home Assistant pages join the device's page rotation and appear in turn with the rest.</li>
+        </ul>
+
+        <div class="note">
+          <p lang="tr"><strong>Gizlilik sınırı.</strong> Varlık adları, durumları ve geçmişleri ePiXeL sunucularına <strong>hiçbir koşulda</strong> iletilmez. Cihazın platform kimlik bilgileri ve seri kimliği de Home Assistant'a gönderilmez. Cihaz bu yolda yalnızca özel IP adreslerine bağlanır; genel adresler reddedilir.</p>
+          <p lang="en"><strong>Privacy boundary.</strong> Entity names, states and history are <strong>never</strong> forwarded to ePiXeL servers. The device's platform credentials and serial identity are likewise never sent to Home Assistant. On this path the device connects to private IP addresses only; public addresses are refused.</p>
+        </div>
+      </section>
+
+      <!-- ═══════════════ 06 SECURITY ═══════════════ -->
+      <section id="sec">
+        <div class="sec-head">
+          <span class="sec-num">§ 06</span>
+          <h2 lang="tr">Güvenlik</h2>
+          <h2 lang="en">Security</h2>
+        </div>
+
+        <p lang="tr">Güvenlik önlemleri dört alanda toplanır: cihaz kimliği, veri aktarımı, yazılım bütünlüğü ve veri asgariliği. Aşağıdaki tablo hangi önlemin bugün devrede olduğunu ve hangisinin üretim hattı yol haritasında bulunduğunu açıkça ayırır.</p>
+        <p lang="en">Controls fall into four areas: device identity, data in transit, software integrity and data minimisation. The table below separates what is active today from what is on the production-line roadmap.</p>
+
+        <div class="tbl-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th><span lang="tr">Önlem</span><span lang="en">Control</span></th>
+                <th><span lang="tr">Açıklama</span><span lang="en">Description</span></th>
+                <th><span lang="tr">Durum</span><span lang="en">Status</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span lang="tr">Donanımsal kimlik</span><span lang="en">Hardware identity</span></td>
+                <td><span lang="tr">Her ünite, yonga üreticisi tarafından fabrikada <strong>yakılmış benzersiz eFuse</strong> alanından türetilen bir kimlik taşır. Bu alan tek yönlüdür ve yazılım kopyalanarak taklit edilemez.</span><span lang="en">Every unit carries an identity derived from a <strong>unique eFuse burned at the factory</strong> by the silicon vendor. The field is one-way and cannot be forged by copying firmware.</span></td>
+                <td><span class="pill on" lang="tr">Devrede</span><span class="pill on" lang="en">Active</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Kimlik bilgisi saklama</span><span lang="en">Credential storage</span></td>
+                <td><span lang="tr">Ağ ve platform kimlik bilgileri cihaz üzerinde <strong>şifreli</strong> bir alanda tutulur; düz metin olarak saklanmaz.</span><span lang="en">Network and platform credentials are held in an <strong>encrypted</strong> store on the device; nothing is kept in plain text.</span></td>
+                <td><span class="pill on" lang="tr">Devrede</span><span class="pill on" lang="en">Active</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Aktarım güvenliği</span><span lang="en">Transport security</span></td>
+                <td><span lang="tr">Platforma giden tüm trafik <strong>TLS</strong> ile korunur. Kök sertifikalar cihaza gömülüdür; doğrulamayı devre dışı bırakan bir kaçış yolu yapıda <strong>bulunmaz</strong>.</span><span lang="en">All platform traffic is protected by <strong>TLS</strong>. Root certificates are embedded in the device, and the build contains <strong>no</strong> escape path that disables verification.</span></td>
+                <td><span class="pill on" lang="tr">Devrede</span><span class="pill on" lang="en">Active</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">İmzalı güncelleme</span><span lang="en">Signed updates</span></td>
+                <td><span lang="tr">Yazılım güncellemeleri <strong>eliptik eğri imzası</strong> ile imzalanır ve kurulumdan önce cihazda doğrulanır. İmzasız görüntü reddedilir; sürüm düşürme engellenir.</span><span lang="en">Firmware images are <strong>elliptic-curve signed</strong> and verified on the device before installation. Unsigned images are refused and downgrades are blocked.</span></td>
+                <td><span class="pill on" lang="tr">Devrede</span><span class="pill on" lang="en">Active</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Güncelleme geri alma</span><span lang="en">Update rollback</span></td>
+                <td><span lang="tr">Çift bölümlü yerleşim sayesinde yeni sürüm sağlıklı açılmazsa cihaz <strong>otomatik olarak</strong> önceki çalışan sürüme döner.</span><span lang="en">A dual-slot layout lets the device return <strong>automatically</strong> to the previous working version if a new one fails to come up healthy.</span></td>
+                <td><span class="pill on" lang="tr">Devrede</span><span class="pill on" lang="en">Active</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Saldırı yüzeyi</span><span lang="en">Attack surface</span></td>
+                <td><span lang="tr">Cihazda dinleyen servis, açık yönetim portu, uzak kabuk veya varsayılan parola <strong>yoktur</strong>. Tüm oturumlar cihaz tarafından başlatılır.</span><span lang="en">The device runs <strong>no</strong> listening service, management port, remote shell or default password. Every session is device-initiated.</span></td>
+                <td><span class="pill on" lang="tr">Devrede</span><span class="pill on" lang="en">Active</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Telsiz gizliliği</span><span lang="en">Intercom confidentiality</span></td>
+                <td><span lang="tr">Ses akışı <strong>oda bazlı anahtarlarla</strong> şifrelenir. Sunucu akışı yönlendirir, içeriğini açmaz.</span><span lang="en">Audio is encrypted with <strong>per-room keys</strong>. The server relays the stream without opening it.</span></td>
+                <td><span class="pill on" lang="tr">Devrede</span><span class="pill on" lang="en">Active</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Mikrofon denetimi</span><span lang="en">Microphone control</span></td>
+                <td><span lang="tr">Mikrofon yalnızca kullanıcı eylemiyle etkinleşir, ayarlardan tamamen kapatılabilir ve etkin olduğu süre boyunca ekranda göstergesi bulunur.</span><span lang="en">The microphone activates only on user action, can be disabled entirely in settings, and shows an on-screen indicator whenever it is live.</span></td>
+                <td><span class="pill on" lang="tr">Devrede</span><span class="pill on" lang="en">Active</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Veri asgariliği</span><span lang="en">Data minimisation</span></td>
+                <td><span lang="tr">Filo telemetrisi teknik sayaçlarla sınırlıdır. Home Assistant verisi, albüm fotoğrafları ve kişisel notlar telemetriye <strong>dahil edilmez</strong>.</span><span lang="en">Fleet telemetry is limited to technical counters. Home Assistant data, album photos and personal notes are <strong>never</strong> included.</span></td>
+                <td><span class="pill on" lang="tr">Devrede</span><span class="pill on" lang="en">Active</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Fabrika sıfırlama</span><span lang="en">Factory reset</span></td>
+                <td><span lang="tr">Cihaz üzerindeki kişisel veriler — ayarlar, notlar, fotoğraflar ve kimlik bilgileri — geri dönüşsüz olarak silinir.</span><span lang="en">Personal data on the device — settings, notes, photos and credentials — is erased irreversibly.</span></td>
+                <td><span class="pill on" lang="tr">Devrede</span><span class="pill on" lang="en">Active</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Güvenli önyükleme</span><span lang="en">Secure boot</span></td>
+                <td><span lang="tr">Önyükleyici düzeyinde donanımsal imza zorunluluğu. Üretim hattında eFuse programlaması ile etkinleştirilecektir.</span><span lang="en">Hardware-enforced signature checking at bootloader level, to be enabled by eFuse programming on the production line.</span></td>
+                <td><span class="pill plan" lang="tr">Yol haritası</span><span class="pill plan" lang="en">Roadmap</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Flash şifreleme</span><span lang="en">Flash encryption</span></td>
+                <td><span lang="tr">Dahili flash içeriğinin donanım anahtarıyla şifrelenmesi. Güvenli önyükleme ile birlikte devreye alınacaktır.</span><span lang="en">Encryption of the internal flash contents with a hardware key, to be enabled alongside secure boot.</span></td>
+                <td><span class="pill plan" lang="tr">Yol haritası</span><span class="pill plan" lang="en">Roadmap</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4 lang="tr">Mühendislik disiplini</h4>
+        <h4 lang="en">Engineering discipline</h4>
+        <p lang="tr">Kalite, gelenek yerine mekanizmayla korunur. Yazılım derlemesi; katman ihlallerini, kaynak yaşam döngüsü hatalarını, kilit sırası tersinmelerini, dokunma hedefi boyutlarını ve yayın bütünlüğünü denetleyen <strong>yirmiden fazla otomatik kapıdan</strong> geçmek zorundadır. Ayrıca her cihaz, kendi alt sistemlerini uçtan uca sınayan bir <strong>dahili öz-test</strong> çalıştırabilir; sonuçlar panele raporlanır.</p>
+        <p lang="en">Quality is enforced by mechanism rather than convention. Every build must pass <strong>more than twenty automated gates</strong> covering layering violations, resource lifetimes, lock-order inversions, touch-target sizes and release integrity. Each device can additionally run a <strong>built-in self-test</strong> across its own subsystems, reporting the result to the panel.</p>
+
+        <div class="note">
+          <p lang="tr">Güvenlik bulgularının bildirimi için: <a href="mailto:epixel@hctbilisim.com">epixel@hctbilisim.com</a>. Bildirimler beş iş günü içinde yanıtlanır.</p>
+          <p lang="en">To report a security finding: <a href="mailto:epixel@hctbilisim.com">epixel@hctbilisim.com</a>. Reports are acknowledged within five working days.</p>
+        </div>
+      </section>
+
+      <!-- ═══════════════ 07 OPERATING MODEL ═══════════════ -->
+      <section id="ops">
+        <div class="sec-head">
+          <span class="sec-num">§ 07</span>
+          <h2 lang="tr">İşletim Modeli</h2>
+          <h2 lang="en">Operating Model</h2>
+        </div>
+
+        <p lang="tr">ePiXeL <strong>perakende olarak satılmaz</strong> ve <strong>tek başına çalışmaz</strong>. Piyasa verisi, mesajlaşma, güncelleme ve yönetim için ePiXeL platformuna bağlıdır. Kurumlar cihazı, müşterilerine verecekleri markalı bir ürün olarak temin eder; yönetim paneli donanımla birlikte kiralama yöntemiyle sağlanır.</p>
+        <p lang="en">ePiXeL is <strong>not sold at retail</strong> and <strong>does not operate on its own</strong>. It depends on the ePiXeL platform for market data, messaging, updates and management. Institutions acquire the device as a branded product to place with their clients; the management panel is provided under a lease alongside the hardware.</p>
+
+        <div class="tbl-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th><span lang="tr">Kalem</span><span lang="en">Item</span></th>
+                <th><span lang="tr">Koşul</span><span lang="en">Terms</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span lang="tr">Asgari sipariş</span><span lang="en">Minimum order</span></td>
+                <td><span class="mono">500</span> <span lang="tr">adet</span><span lang="en">units</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Yönetim paneli</span><span lang="en">Management panel</span></td>
+                <td><span lang="tr">Donanımla birlikte kiralama ile sağlanır</span><span lang="en">Provided under a lease alongside the hardware</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Özelleştirme</span><span lang="en">Customisation</span></td>
+                <td><span lang="tr">Kurum markası, sayfa seçimi ve içerik politikası</span><span lang="en">Client branding, page selection and content policy</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Hedef müşteri</span><span lang="en">Target customer</span></td>
+                <td><span lang="tr">Bankalar, aracı kurumlar ve döviz şirketleri</span><span lang="en">Banks, brokerage houses and foreign-exchange firms</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Diller</span><span lang="en">Languages</span></td>
+                <td><span lang="tr">Türkçe ve İngilizce</span><span lang="en">Turkish and English</span></td>
+              </tr>
+              <tr>
+                <td><span lang="tr">Ürün sayfası</span><span lang="en">Product page</span></td>
+                <td><a href="https://epixel.app/en/products/epixel-ekran">epixel.app/en/products/epixel-ekran</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <footer>
+    <div>
+      <div class="fmark" lang="tr">İletişim</div>
+      <div class="fmark" lang="en">Contact</div>
+      <p><a href="mailto:epixel@hctbilisim.com">epixel@hctbilisim.com</a></p>
+      <p><a href="https://epixel.app/en/products/epixel-ekran">epixel.app/en/products/epixel-ekran</a></p>
+      <p lang="tr">Fiyatlandırma, teslim süresi, markalama ve pilot programlar için e-posta ile ulaşın.</p>
+      <p lang="en">Write to us for pricing, lead times, branding and pilot programmes.</p>
+    </div>
+    <div>
+      <div class="fmark" lang="tr">Doküman</div>
+      <div class="fmark" lang="en">Document</div>
+      <p lang="tr">Sistem mimarisi, servisler ve güvenlik özeti. Sürüm 1.0.</p>
+      <p lang="en">System architecture, services and security overview. Revision 1.0.</p>
+      <p lang="tr">Mekanik veri sayfası, sertifikasyon dosyaları ve entegrasyon dokümanları talep üzerine.</p>
+      <p lang="en">Mechanical datasheet, certification files and integration documents on request.</p>
+    </div>
+    <div>
+      <div class="fmark">ePiXeL · HCT Bilişim</div>
+      <p lang="tr">ePiXeL, HCT Bilişim'in tescilli markasıdır. Bu doküman ürün tanıtım amaçlıdır ve sözleşme hükmü teşkil etmez.</p>
+      <p lang="en">ePiXeL is a trademark of HCT Bilişim. This document is provided for product information and forms no part of any contract.</p>
+    </div>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var buttons = document.querySelectorAll('.langs button');
+
+    function setLang(code) {
+      root.setAttribute('lang', code);
+      buttons.forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b.dataset.set === code));
+      });
+      try { localStorage.setItem('epx-lang', code); } catch (e) {}
+    }
+
+    var saved = null;
+    try { saved = localStorage.getItem('epx-lang'); } catch (e) {}
+    setLang(saved === 'en' || saved === 'tr' ? saved
+      : ((navigator.language || 'tr').toLowerCase().indexOf('tr') === 0 ? 'tr' : 'en'));
+
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () { setLang(b.dataset.set); });
+    });
+  })();
+</script>
+
+</body>
+</html>

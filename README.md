@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="docs/images/hero.png" alt="ePiXeL display showing a Home Assistant page" width="680">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/epixel-logo-dark.png">
+    <img src="docs/images/epixel-logo-light.png" alt="ePiXeL" width="280">
+  </picture>
 </p>
 
 <h1 align="center">ePiXeL Display — Home Assistant Integration</h1>
@@ -61,11 +64,12 @@ Home Assistant's own interface. The display simply draws them.
   display's other content, with a dwell time you control.
 - **Local only** — no cloud account, no relay, no telemetry about your home.
 
-### Screenshots
+### See it before it ships
 
-| Pairing | Page builder | On the display |
-|:--:|:--:|:--:|
-| <img src="docs/images/pairing.png" width="240"> | <img src="docs/images/page-builder.png" width="240"> | <img src="docs/images/device-page.jpg" width="240"> |
+The integration serves a **live preview of the device screen** at
+`http://<your-home-assistant>:8123/api/epixel/preview`. It renders your pages at
+the display's real resolution, so you can adjust a layout without walking over
+to the device. Open it from the integration's **Configure** screen.
 
 ---
 
@@ -206,8 +210,6 @@ Logs: **Settings → System → Logs**, filter for `custom_components.epixel`.
 
 # The ePiXeL display
 
-<img src="docs/images/device.jpg" align="right" width="280" alt="ePiXeL display">
-
 ePiXeL is a 4-inch networked information display built by **HCT Bilişim**. It is
 a finished, in-production product: the firmware is complete, the management
 platform is live, and units are manufactured in series.
@@ -344,6 +346,15 @@ For pricing, lead times, branding and pilot programmes, get in touch by e-mail.
 *Product photography and video coming soon.*
 
 ---
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| **[PROTOCOL.md](PROTOCOL.md)** | The wire contract between this integration and the display: five endpoints, field by field |
+| **[docs/architecture.html](docs/architecture.html)** | System architecture, services, network topology and security posture — Turkish and English |
+| **[SECURITY.md](SECURITY.md)** | Disclosure address, design notes for researchers, accepted risks |
+| **[CHANGELOG.md](CHANGELOG.md)** | Release history |
 
 ## Contributing
 

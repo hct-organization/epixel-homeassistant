@@ -93,21 +93,65 @@ def draw(view: dict) -> None:
                   f"[{box.get('i')}] {box.get('k')}{graph}")
 
 
+def parse_target(raw: str, fallback_port: int) -> tuple[str, int]:
+    """Accept 192.168.1.20, 192.168.1.20:8123 or http://192.168.1.20:8123/."""
+    raw = raw.strip()
+    for scheme in ("http://", "https://"):
+        if raw.startswith(scheme):
+            raw = raw[len(scheme):]
+    raw = raw.split("/", 1)[0]
+    if ":" in raw:
+        host, _, port = raw.partition(":")
+        try:
+            return host, int(port)
+        except ValueError:
+            return host, fallback_port
+    return raw, fallback_port
+
+
+def wait_for_integration(base: str) -> dict:
+    """Poll /ping until the integration answers.
+
+    404 does NOT mean 'not installed'. Home Assistant does not load a
+    config-flow-only integration until the user starts its config flow, so
+    before the very first pairing the endpoints genuinely do not exist yet.
+    Exiting here would tell the user something false; we wait instead.
+    """
+    deadline = time.time() + 300
+    told = False
+    while time.time() < deadline:
+        status, body = call(base, "/ping")
+        if status == 200:
+            return body
+        if status == 0:
+            print(f"  ! cannot reach {base} -- {body.get('e')}")
+            print("    Check the address. Home Assistant usually listens on port 8123.")
+        elif status == 404 and not told:
+            told = True
+            print("  ! the ePiXeL endpoints are not up yet.\n")
+            print("    In Home Assistant, open:")
+            print("      Settings > Devices & Services > Add Integration > ePiXeL")
+            print("    and leave the code dialog open. Home Assistant only loads the")
+            print("    integration once that flow starts.\n")
+            print("    If ePiXeL is not in the list, install it through HACS first")
+            print("    and restart Home Assistant.\n")
+            print("    Waiting...")
+        time.sleep(3)
+    sys.exit("FAILED: the integration never answered within 5 minutes")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("host")
+    parser.add_argument("host", help="192.168.1.20, 192.168.1.20:8123 or a full URL")
     parser.add_argument("--port", type=int, default=8123)
     parser.add_argument("--reset", action="store_true", help="forget the saved token")
     args = parser.parse_args()
 
-    base = f"http://{args.host}:{args.port}/api/epixel"
+    host, port = parse_target(args.host, args.port)
+    base = f"http://{host}:{port}/api/epixel"
+    print(f"Home Assistant: http://{host}:{port}")
 
-    status, body = call(base, "/ping")
-    if status != 200:
-        sys.exit(
-            f"FAILED: /ping returned {status} -- is the integration installed "
-            f"and was Home Assistant restarted?\n  {body}"
-        )
+    body = wait_for_integration(base)
     print(f"OK integration found: protocol v{body.get('ver')} · HA {body.get('hass')}")
 
     if args.reset and os.path.exists(STATE_FILE):

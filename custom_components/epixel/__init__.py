@@ -16,6 +16,7 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.typing import ConfigType
 
@@ -24,6 +25,11 @@ from .model import pages_of, tracked_entities
 from .views import async_register_views
 
 _LOGGER = logging.getLogger(__name__)
+
+# There is nothing to configure in YAML -- the display is paired from the UI.
+# async_setup still exists so the endpoints are up before the first config
+# entry is created; this schema tells Home Assistant that is deliberate.
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 def ensure_data(hass: HomeAssistant) -> dict:

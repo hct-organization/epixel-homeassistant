@@ -121,6 +121,13 @@ def render(view: dict, language: str, device_name: str) -> str:
     display:flex;flex-direction:column;gap:4px;min-width:0;overflow:hidden;
   }}
   .box.act{{background:linear-gradient(180deg,var(--scr-2),var(--scr))}}
+  /* A lit box has to read from across the room, so the difference is WEIGHT
+     and not only hue -- a 2px edge plus a soft glow, matching what the firmware
+     now draws. Colour alone left two boxes looking alike from three metres, and
+     left nothing at all for a colour-blind viewer.
+     Inset rather than a real border: a border would resize the box and shift
+     everything inside it by two pixels the moment a light came on. */
+  .box.on{{box-shadow:inset 0 0 0 2px var(--accent),0 0 10px rgba(0,0,0,.20)}}
   .box .top{{display:flex;align-items:center;gap:7px;color:var(--scr-muted)}}
   .box .top svg{{flex:0 0 auto}}
   .box.on .top{{color:var(--accent)}}
@@ -137,7 +144,9 @@ def render(view: dict, language: str, device_name: str) -> str:
   .on .dotm{{background:var(--on);box-shadow:0 0 0 3px rgba(63,191,127,.18)}}
   .off .dotm{{background:var(--off)}}
   .on .st{{color:var(--on)}} .off .st{{color:var(--scr-muted)}}
-  .bar-l{{height:4px;border-radius:2px;background:var(--scr-line);margin-top:5px;overflow:hidden}}
+  /* 6px and rounded, as the firmware draws it. At 4px the brightness bar read
+     as the card's edge rather than as a control. */
+  .bar-l{{height:6px;border-radius:3px;background:var(--scr-line);margin-top:5px;overflow:hidden}}
   .bar-l i{{display:block;height:100%;background:var(--accent)}}
   .chip{{
     align-self:flex-start;font:600 8px/1 ui-monospace,Menlo,monospace;

@@ -27,8 +27,9 @@ You choose which entities appear and how they are grouped into pages, using
 Home Assistant's own interface. The display simply draws them.
 
 > **Looking for the device itself?** See [The ePiXeL display](#the-epixel-display)
-> further down. It is a business product, not a retail one —
-> [epixel@hctbilisim.com](mailto:epixel@hctbilisim.com).
+> further down, or the product page at
+> **[epixel.app](https://epixel.app/en/products/epixel-ekran)**. It is a business
+> product, not a retail one — [epixel@hctbilisim.com](mailto:epixel@hctbilisim.com).
 
 ---
 
@@ -335,6 +336,7 @@ management.
 | **Minimum order** | **500 units** |
 | **Management panel** | provided under a lease, alongside the hardware |
 | **Customisation** | client branding, page selection and content policy |
+| **Product page** | **[epixel.app/en/products/epixel-ekran](https://epixel.app/en/products/epixel-ekran)** |
 | **Contact** | **[epixel@hctbilisim.com](mailto:epixel@hctbilisim.com)** |
 
 For pricing, lead times, branding and pilot programmes, get in touch by e-mail.

@@ -17,6 +17,7 @@ Exits non-zero on the first failure so it can gate a build.
 from __future__ import annotations
 
 import pathlib
+import re
 import sys
 import types
 
@@ -37,9 +38,10 @@ sys.modules["homeassistant.config_entries"].ConfigEntry = object
 sys.modules["homeassistant.core"].HomeAssistant = object
 
 from epixel import icons, preview  # noqa: E402
-from epixel.const import CONF_ICONS, CONF_PAGES, DOMAIN  # noqa: E402
+from epixel.const import CONF_ICONS, CONF_PAGES, DOMAIN, NAME_MAX  # noqa: E402
 from epixel.icon_paths import ICON_PATHS  # noqa: E402
 from epixel.model import (  # noqa: E402
+    _renderable,
     build_view, clean_text, key_map, key_of, level_means_off, next_level,
     tracked_entities,
 )
@@ -132,6 +134,112 @@ def test_names() -> None:
     check("turkce harfler korunur", clean_text("Işık Ğüçü") == "Işık Ğüçü")
 
 
+def test_wire_limits() -> None:
+    """The display sizes its buffers from the limit declared here.
+
+    The two sides live in different repositories, so nothing -- no compiler, no
+    import -- ties them together. PROTOCOL.md is the only link, and that is
+    exactly how the Turkish text defect happened: the server trimmed to 22
+    CHARACTERS while the display reserved 23 BYTES, so a two-byte letter got cut
+    in half. Nothing failed loudly; the screen just drew a broken glyph.
+
+    The number is therefore checked against the document the firmware was
+    written from. Changing one side alone now fails here instead of on a screen.
+    """
+    print("\ntel sinirlari")
+    protocol = (ROOT / "PROTOCOL.md").read_text(encoding="utf-8")
+
+    stated = re.findall(r"max (\d+) characters", protocol)
+    check("PROTOCOL.md ad sinirini yaziyor", bool(stated), str(stated))
+    check("const.py sinir belgeyle ayni",
+          bool(stated) and int(stated[0]) == NAME_MAX,
+          f"belge={stated[0] if stated else '?'} kod={NAME_MAX}")
+
+    # The display keeps NAME_MAX * 4 + 1 bytes in a uint8_t. Past 63 characters
+    # that arithmetic overflows the type and the buffer collapses to one byte,
+    # which would empty every name on screen without a single warning.
+    check("sinir cihaz tamponuna sigiyor", NAME_MAX * 4 + 1 <= 255,
+          f"{NAME_MAX} karakter -> {NAME_MAX * 4 + 1} bayt")
+
+    # The worst case actually reached: every character a four-byte one.
+    worst = len(("🔆" * NAME_MAX).encode("utf-8")) + 1
+    check("en kotu durum tamponu asmiyor", worst <= 255, f"{worst} bayt")
+
+    # A Turkish name at the limit must survive the trim intact -- this is the
+    # exact shape of the string the owner saw come out broken.
+    turkish = clean_text("Işık Ğüçü Şalteri Öüçğş")[:NAME_MAX]
+    check("turkce ad sinirda bozulmuyor",
+          turkish.encode("utf-8").decode("utf-8") == turkish
+          and len(turkish) <= NAME_MAX,
+          f"{len(turkish)} karakter / {len(turkish.encode('utf-8'))} bayt")
+
+
+def test_drawable_output() -> None:
+    """Nothing may reach the display that its font cannot draw.
+
+    The font carries ASCII, Latin-1, six Turkish letters and the euro sign --
+    seven glyphs beyond Latin-1, and nothing else. A character it lacks is not
+    skipped: it is drawn as an empty box. The owner reported a screen full of
+    them, and the source turned out to be this integration's OWN output -- an
+    ellipsis in the name shortener and an em dash for "value unavailable".
+    Neither was anything a user had typed.
+
+    So the rule is checked against everything the model can emit, not just
+    against the two characters that were caught.
+    """
+    print("\ncizilebilir cikti")
+
+    check("ellipsis katlanir", clean_text("bir…iki") == "bir..iki")
+    check("em dash katlanir", clean_text("bir—iki") == "bir-iki")
+    check("egri tirnak duzlesir", clean_text("Ali’nin") == "Ali'nin")
+    check("kirilmaz bosluk normale doner",
+          clean_text("bir iki") == "bir iki")
+
+    # Accents outside the font lose the mark instead of becoming a box.
+    check("aksan duser, harf kalir",
+          clean_text("Świetlik") == "Swietlik", clean_text("Świetlik"))
+
+    # Nothing recoverable -> a visible question mark, never a broken glyph.
+    check("cevrilemeyen yazi soru isareti olur",
+          clean_text("Свет") == "????", clean_text("Свет"))
+
+    # Turkish must pass through untouched -- it is inside the font.
+    check("turkce dokunulmadan gecer",
+          clean_text("Işık Ğüçü Şalteri") == "Işık Ğüçü Şalteri")
+    check("euro isareti gecer", clean_text("120 €") == "120 €")
+
+    # The whole payload, including the shortener and the placeholder values.
+    nasty = {
+        "light.a": FakeState("light.a", "on",
+                             friendly_name="Cok Uzun Vitrin Isigi Seridi Bir",
+                             supported_color_modes=["onoff"]),
+        "light.b": FakeState("light.b", "on",
+                             friendly_name="Cok Uzun Vitrin Isigi Seridi Iki",
+                             supported_color_modes=["onoff"]),
+        "sensor.c": FakeState("sensor.c", "unknown",
+                              friendly_name="Свет — Температура"),
+        "sensor.d": FakeState("sensor.d", "21.5",
+                              friendly_name="Unité… Спец",
+                              unit_of_measurement="°C"),
+    }
+    view = build_view(FakeHass(nasty), FakeEntry([{"title": "Salon — Işık",
+                                                  "entities": list(nasty)}]))
+    bad: list[str] = []
+    for page in view["pages"]:
+        for text in [page["t"]] + [b["n"] for b in page["b"]] \
+                    + [str(b.get("v", "")) for b in page["b"]] \
+                    + [str(b.get("u", "")) for b in page["b"]]:
+            bad += [f"U+{ord(c):04X} ({text!r})" for c in text if not _renderable(c)]
+    check("tum yuk cizilebilir", not bad, "; ".join(bad[:3]))
+
+    # And the shortener still does its job with the ASCII replacement.
+    names = [b["n"] for b in view["pages"][0]["b"]]
+    check("kisaltilan iki ad hala ayirt edilebilir",
+          names[0] != names[1], f"{names[0]!r} vs {names[1]!r}")
+    check("kisaltma sinira uyuyor", all(len(n) <= NAME_MAX for n in names),
+          str([len(n) for n in names]))
+
+
 def test_layout_and_types() -> None:
     print("\nsayfa modeli")
     pages = [{"title": "Salon", "entities": list(STATES)}]
@@ -179,10 +287,10 @@ def test_edge_cases() -> None:
 
     view = build_view(hass, FakeEntry([{"title": "X", "entities": ["sensor.yok_boyle"]}]))
     box = view["pages"][0]["b"][0]
-    check("silinmis varlik kutusu kalir", box["y"] == "txt" and box["v"] == "—")
+    check("silinmis varlik kutusu kalir", box["y"] == "txt" and box["v"] == "-")
 
     view = build_view(hass, FakeEntry([{"title": "X", "entities": ["sensor.unavail"]}]))
-    check("erisilemez varlik — gosterir", view["pages"][0]["b"][0]["v"] == "—")
+    check("erisilemez varlik tire gosterir", view["pages"][0]["b"][0]["v"] == "-")
 
     pages = [{"title": "Y", "entities": ["sensor.temp"], CONF_ICONS: {"sensor.temp": "fire"}}]
     view = build_view(hass, FakeEntry(pages))
@@ -272,6 +380,8 @@ def main() -> int:
     print("ePiXeL entegrasyon oz-testi")
     test_icon_set()
     test_names()
+    test_wire_limits()
+    test_drawable_output()
     test_layout_and_types()
     test_edge_cases()
     test_commands()

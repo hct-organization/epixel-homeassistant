@@ -65,25 +65,73 @@ def key_map(entry: ConfigEntry) -> dict[str, str]:
     return {key_of(entity_id): entity_id for entity_id in tracked_entities(entry)}
 
 
+# Exactly what the display can draw. Its font carries ASCII, Latin-1, the six
+# Turkish letters that live outside Latin-1, and the euro sign -- nothing else.
+#
+# A missing character is NOT skipped by the font: it is drawn as an empty box.
+# The owner saw a row of them and reported it as "names with a space come out
+# as []" -- the space was a coincidence, long names are simply the ones that
+# collide, and the collision resolver below was inserting a character (…) the
+# display does not have. An em dash used for "value unavailable" had the same
+# problem. Both were OUR OWN output, not anything the user typed.
+_DEVICE_EXTRA = frozenset("ĞğİıŞş€")
+
+
+def _renderable(ch: str) -> bool:
+    code = ord(ch)
+    return 0x20 <= code <= 0x7E or 0xA0 <= code <= 0xFF or ch in _DEVICE_EXTRA
+
+
+# Typography with an obvious ASCII equal. Worth translating rather than
+# dropping: it arrives constantly in names copied out of phones and
+# spreadsheets, and the first two entries were characters this integration
+# produced itself.
+_FOLD = {
+    "…": "..", "—": "-", "–": "-", "−": "-",
+    "‘": "'", "’": "'", "“": '"', "”": '"',
+    "•": "-", "×": "x", " ": " ",
+}
+
+
 def clean_text(raw: object) -> str:
     """Make a user-supplied string safe to put on the wire and on the screen.
 
     Home Assistant lets a friendly name contain anything: tabs, newlines pasted
     from a spreadsheet, zero-width joiners, control characters from a badly
-    behaved integration. The display renders text into a fixed-width box and
-    writes it to its log, so it is cleaned once, here, rather than defended
-    against in three places later.
+    behaved integration, and any script on earth. The display renders text into
+    a fixed-width box and writes it to its log, so it is cleaned once, here,
+    rather than defended against in three places later.
 
     Line breaks and control characters become spaces, runs of whitespace
     collapse to one, and the ends are trimmed.
+
+    Anything the display cannot draw is dealt with rather than passed through.
+    Accented letters outside its font lose the accent, because "Swietlik" reads
+    far better than a box, and only what survives neither step becomes a
+    question mark -- visibly "cannot show this" instead of visibly broken.
     """
-    text = str(raw or "")
-    text = unicodedata.normalize("NFC", text)
-    text = "".join(
-        " " if unicodedata.category(ch)[0] == "C" else ch
-        for ch in text
-    )
-    return " ".join(text.split())
+    text = unicodedata.normalize("NFC", str(raw or ""))
+
+    out: list[str] = []
+    for ch in text:
+        if unicodedata.category(ch)[0] == "C":
+            out.append(" ")
+            continue
+        if _renderable(ch):
+            out.append(ch)
+            continue
+        if ch in _FOLD:
+            out.append(_FOLD[ch])
+            continue
+        # Strip the accent and keep the base letter if that is drawable.
+        stripped = "".join(
+            c for c in unicodedata.normalize("NFKD", ch)
+            if not unicodedata.combining(c)
+        )
+        out.append(stripped if stripped and all(_renderable(c) for c in stripped)
+                   else "?")
+
+    return " ".join("".join(out).split())
 
 
 def build_view(hass: HomeAssistant, entry: ConfigEntry) -> dict:
@@ -121,9 +169,12 @@ def _fit_names(boxes: list[dict]) -> None:
         collides = collisions[short[index]] > 1
         distinct = full.count(name) == 1
         if collides and distinct and len(name) > NAME_MAX:
+            # ".." and not "…": the display's font has no ellipsis character
+            # and draws an empty box in its place. Two dots cost one more
+            # column and are drawable everywhere.
             head = NAME_MAX // 2 - 1
-            tail = NAME_MAX - head - 1
-            short[index] = name[:head] + "…" + name[-tail:]
+            tail = NAME_MAX - head - 2
+            short[index] = name[:head] + ".." + name[-tail:]
 
     for box, name in zip(boxes, short):
         box["n"] = name
@@ -143,7 +194,7 @@ def _box(hass: HomeAssistant, entity_id: str, icon_override: str | None = None) 
             "k": key,
             "n": clean_text(entity_id.split(".")[-1].replace("_", " ")),
             "y": "txt",
-            "v": "—",
+            "v": "-",
             "i": chosen or icons.FALLBACK,
         }
 
@@ -158,7 +209,7 @@ def _box(hass: HomeAssistant, entity_id: str, icon_override: str | None = None) 
 
     if state.state in ("unavailable", "unknown"):
         box["y"] = "txt"
-        box["v"] = "—"
+        box["v"] = "-"
         return box
 
     on = state.state == "on"

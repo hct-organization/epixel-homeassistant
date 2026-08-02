@@ -289,28 +289,33 @@ Turkish and English.
 
 | | |
 |---|---|
-| **SoC** | Espressif ESP32-S3, dual-core 240 MHz |
-| **Memory** | 16 MB flash · 8 MB OPI PSRAM |
-| **Display** | 4-inch 320 × 480 IPS, ST7796 controller over SPI |
-| **Touch** | FT6336U capacitive, I²C |
-| **Audio out** | MAX98357A I²S class-D amplifier and speaker |
-| **Audio in** | INMP441 I²S MEMS microphone |
-| **Network** | 2.4 GHz Wi-Fi |
-| **Mounting** | Desk stand or wall mount |
+| **Processor** | ESP32 |
+| **Display** | 4-inch 320 × 480 IPS, portrait, SPI interface |
+| **Touch** | Capacitive multi-touch panel, I²C, hardware interrupt line |
+| **Audio out** | I²S digital audio into a class-D amplifier and integrated speaker |
+| **Audio in** | I²S digital MEMS microphone, enabled only on user action |
+| **Network** | 2.4 GHz Wi-Fi, 802.11 b/g/n, WPA2 / WPA3 compatible |
+| **Storage** | Internal flash with an encrypted credential store and a dual-slot update layout |
+| **Mounting** | Desk stand or wall bracket |
+
+Mechanical dimensions, power figures, certification files and branding options
+are supplied on request in a separate hardware datasheet.
 
 ## Firmware and platform engineering
 
-The firmware is written **natively against ESP-IDF** — no Arduino layer — with
-**LVGL** for the interface and **FreeRTOS** for scheduling. Real-time data and
-remote commands arrive over **MQTT with TLS**; bulk transfers use HTTPS against
-pinned root certificates, with no insecure fallback path anywhere in the build.
+The firmware runs natively on a real-time operating system, drawing the interface
+on a dedicated task while network, audio and sensor work proceed on separate
+ones. Real-time data and remote commands arrive over **MQTT with TLS**; bulk
+transfers use HTTPS against **pinned root certificates**, and the build contains
+no path that disables certificate verification.
 
-Each unit carries a **hardware-unique identity derived from a factory-programmed
-eFuse**, so identity cannot be cloned by copying firmware. Credentials are held
-in **encrypted non-volatile storage**. Firmware updates are **ECDSA P-256
-signed** and verified on-device before installation, with automatic rollback if
-a new image fails to come up healthy. Crashes are captured and reported, and
-every unit publishes health telemetry to the panel.
+Each unit carries a **hardware-unique identity derived from a factory-burned
+eFuse**, so identity cannot be forged by copying firmware. Credentials are held
+in **encrypted storage**. Firmware images are **elliptic-curve signed** and
+verified on the device before installation, with downgrade prevention and
+automatic rollback if a new version fails to come up healthy. The device runs no
+listening service, management port, remote shell or default password — every
+session is device-initiated.
 
 Quality is enforced mechanically rather than by convention: the build is gated by
 more than twenty automated checks covering layering, resource lifetimes, lock

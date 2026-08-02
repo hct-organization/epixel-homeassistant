@@ -74,13 +74,12 @@ ICON_PATHS: dict[str, tuple[str, str]] = {
         "7C9.08,4.37 8.54,4.03 7.92,4.03Z"
     ),
     "door": (
-        "door",
-        "M8,3C6.89,3 6,3.89 6,5V21H18V5C18,3.89 17.11,3"
-        "16,3H8M8,5H16V19H8V5M13,11V13H15V11H13Z"
+        "door-open",
+        "M12,3C10.89,3 10,3.89 10,5H3V19H2V21H22V19H21V5C21,3.89 20.11,3 19,3H12M12,5H19V19H12V5M5,11H7V13H5V11Z"
     ),
     "window": (
-        "window-closed-variant",
-        "M21 20V2H3V20H1V23H23V20M19 4V11H13V4M5 4H11V11H5M5 20V13H11V20M13 20V13H19V20Z"
+        "window-open-variant",
+        "M21 20V2H3V20H1V23H23V20M19 4V11H17V4M5 4H7V11H5M5 20V13H7V20M9 20V4H15V20M17 20V13H19V20Z"
     ),
     "lock": (
         "lock",
@@ -262,12 +261,60 @@ ICON_PATHS: dict[str, tuple[str, str]] = {
     ),
 }
 
+#: Durum-ozel sekiller. Renk degistirmek tek basina yetmez -- kapali bir
+#: ampul ile acik bir ampul, bakan kisinin ANINDA ayirt etmesi gereken iki
+#: seydir. Listede olmayan ikonlar her iki durumda ayni sekli kullanir.
+ICON_PATHS_OFF: dict[str, tuple[str, str]] = {
+    "bulb": (
+        "lightbulb-outline",
+        "M12,2A7,7 0 0,1 19,9C19,11.38 17.81,13.47 16,14.74V17A1,1 0 0,1 15,18H9A1,1 0 0,1 8,17V14.74C6.19,13.47 5,11.38 5,9A7,7 0 0,1 12,2M9,21V20H15V21A1,1 0 0,1 14,22H10A1,1 0 0,1 9,21M12,4A5,5 0 0,0 7,9C7,11.05 8.23,12.81 10,13.58V16H14V13.58C15.77,12.81 17,11.05 17,9A5,5 0 0,0 12,4Z"
+    ),
+    "dimmer": (
+        "lightbulb-off-outline",
+        "M12,2C9.76,2 7.78,3.05 6.5,4.68L7.93,6.11C8.84,4.84 10.32,4 12,4A5,5 0 0,1 17,9C17,10.68 16.16,12.16 14.89,13.06L16.31,14.5C17.94,13.21 19,11.24 19,9A7,7 0 0,0 12,2M3.28,4L2,5.27L5.04,8.3C5,8.53 5,8.76 5,9C5,11.38 6.19,13.47 8,14.74V17A1,1 0 0,0 9,18H14.73L18.73,22L20,20.72L3.28,4M7.23,10.5L12.73,16H10V13.58C8.68,13 7.66,11.88 7.23,10.5M9,20V21A1,1 0 0,0 10,22H14A1,1 0 0,0 15,21V20H9Z"
+    ),
+    "switch": (
+        "toggle-switch-off-outline",
+        "M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6zm0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4zM7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+    ),
+    "plug": (
+        "power-plug-off",
+        "M20.84 22.73L15.31 17.2L14.5 18V21H9.5V18L6 14.5V9C6 8.7 6.1 8.41 6.25 8.14L1.11 3L2.39 1.73L22.11 21.46L20.84 22.73M18 14.5V9C18 8 17 7 16 7V3H14V7H10.2L17.85 14.65L18 14.5M10 3H8V4.8L10 6.8V3Z"
+    ),
+    "fan": (
+        "fan-off",
+        "M12.5,2C9.64,2 8.57,4.55 9.29,7.47L15,13.16C15.87,13.37 16.81,13.81 17.28,14.73C18.46,17.1 22.03,17 22.03,12.5C22.03,8.92 18.05,8.13 14.35,10.13C14.03,9.73 13.61,9.42 13.13,9.22C13.32,8.29 13.76,7.24 14.75,6.75C17.11,5.57 17,2 12.5,2M3.28,4L2,5.27L4.47,7.73C3.22,7.74 2,8.87 2,11.5C2,15.07 5.96,15.85 9.65,13.87C9.97,14.27 10.4,14.59 10.89,14.79C10.69,15.71 10.25,16.75 9.27,17.24C6.91,18.42 7,22 11.5,22C13.8,22 14.94,20.36 14.94,18.21L18.73,22L20,20.72L3.28,4Z"
+    ),
+    "lock": (
+        "lock-open-variant",
+        "M18 1C15.24 1 13 3.24 13 6V8H4C2.9 8 2 8.89 2 10V20C2 21.11 2.9 22 4 22H16C17.11 22 18 21.11 18 20V10C18 8.9 17.11 8 16 8H15V6C15 4.34 16.34 3 18 3C19.66 3 21 4.34 21 6V8H23V6C23 3.24 20.76 1 18 1M10 13C11.1 13 12 13.89 12 15C12 16.11 11.11 17 10 17C8.9 17 8 16.11 8 15C8 13.9 8.9 13 10 13Z"
+    ),
+    "door": (
+        "door-closed",
+        "M16,11H18V13H16V11M12,3H19C20.11,3 21,3.89 21,5V19H22V21H2V19H10V5C10,3.89 10.89,3 12,3M12,5V19H19V5H12Z"
+    ),
+    "window": (
+        "window-closed-variant",
+        "M21 20V2H3V20H1V23H23V20M19 4V11H13V4M5 4H11V11H5M5 20V13H11V20M13 20V13H19V20Z"
+    ),
+    "motion": (
+        "motion-sensor-off",
+        "M11.4 8.2H15V10H13.2L11.4 8.2M19.67 1H18.33C18.33 3.58 20.42 5.67 23 5.67V4.33C21.16 4.33 19.67 2.84 19.67 1M21 1C21 2.11 21.9 3 23 3V1H21M17 1H15.67C15.67 5.05 18.95 8.33 23 8.33V7C19.69 7 17 4.31 17 1M10 3.8C11 3.8 11.8 3 11.8 2S11 .2 10 .2 8.2 1 8.2 2 9 3.8 10 3.8M2.39 1.73L1.11 3L3.46 5.35L2 5.8V11H3.8V7.33L5.05 6.94L5.68 7.57L2 22H3.8L6.67 13.89L9 17V22H10.8V15.59L8.31 11.05L8.5 10.37L20.84 22.73L22.11 21.46L2.39 1.73M9.38 4.87C9.08 4.37 8.54 4.03 7.92 4.03C7.75 4.03 7.58 4.06 7.42 4.11L7.34 4.14L11.35 8.15L9.38 4.87Z"
+    ),
+}
+
 VIEWBOX = 24
 
 
-def svg(name: str, size: int = 24, colour: str = "currentColor") -> str:
-    """Inline SVG markup for one icon. Unknown names fall back to `dot`."""
-    _, path = ICON_PATHS.get(name) or ICON_PATHS["dot"]
+def svg(name: str, size: int = 24, colour: str = "currentColor",
+        on: bool = True) -> str:
+    """Inline SVG markup for one icon. Unknown names fall back to `dot`.
+
+    `on=False` picks the off-state shape where one exists, so a lamp that is
+    off does not merely change colour.
+    """
+    table = ICON_PATHS if on else {**ICON_PATHS, **ICON_PATHS_OFF}
+    _, path = table.get(name) or ICON_PATHS["dot"]
     return (
         f'<svg viewBox="0 0 {VIEWBOX} {VIEWBOX}" width="{size}" height="{size}" '
         f'fill="{colour}" aria-hidden="true"><path d="{path}"/></svg>'

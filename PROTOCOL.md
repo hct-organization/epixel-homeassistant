@@ -244,8 +244,13 @@ moon    shield
 The shapes are **Material Design Icons** — the same family Home Assistant
 itself uses — so an icon on the display matches the one beside the entity in
 Home Assistant. They live in `custom_components/epixel/icon_paths.py` together
-with their upstream names, and the firmware glyphs are generated from that same
-file, so the preview and the hardware cannot drift apart.
+with their upstream names.
+
+**The display's assets are generated from that same file.** The firmware
+repository runs `tools/gen_ha_icons.sh`, which reads `icon_paths.py`, renders
+each path and emits the on-device image. The browser preview and the hardware
+therefore draw from one source and cannot drift apart — an icon that looks
+right in the preview is the icon the display shows.
 
 **How an icon is chosen**
 

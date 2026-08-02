@@ -30,6 +30,7 @@ from homeassistant.core import HomeAssistant
 from . import icons
 from .const import (
     CONF_ICONS,
+    DIM_STEP,
     CONF_PAGES,
     DIM_MIN,
     DOMAIN,
@@ -194,6 +195,39 @@ def _box(hass: HomeAssistant, entity_id: str, icon_override: str | None = None) 
     if attrs.get("state_class") in GRAPHABLE_STATE_CLASSES:
         box["g"] = 1
     return box
+
+
+def next_level(current: int, action: str, requested: int | None) -> int | None:
+    """Where a dim command should land, given the light's CURRENT level.
+
+    Pure on purpose: this is the arithmetic a user feels on every press, and
+    it used to live inside the HTTP handler where it could only be checked by
+    running Home Assistant. Returning None means the request was malformed.
+
+    `up`/`down` resolve against `current` -- the light's live level, not what
+    the display last drew. A lamp someone changed at a wall switch would
+    otherwise jump to the wrong value on the first press.
+    """
+    if action == "set":
+        if requested is None:
+            return None
+        target = int(requested)
+    elif action == "up":
+        target = current + DIM_STEP
+    elif action == "down":
+        target = current - DIM_STEP
+    else:
+        return None
+    return max(0, min(100, target))
+
+
+def level_means_off(level: int) -> bool:
+    """A target under the floor is OFF, not "very dim".
+
+    brightness_pct=2 leaves a lamp that looks off but reports on, and the next
+    press then climbs from 2 instead of from zero.
+    """
+    return level < DIM_MIN
 
 
 def _brightness_percent(attrs) -> int:

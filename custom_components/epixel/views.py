@@ -27,8 +27,6 @@ from .const import (
     API_BASE,
     CONF_DEVICE_NAME,
     CONF_TOKEN,
-    DIM_MIN,
-    DIM_STEP,
     DOMAIN,
     HISTORY_MAX_HOURS,
     HISTORY_POINTS,
@@ -40,7 +38,7 @@ from .const import (
     SWITCHABLE_DOMAINS,
 )
 from .icons import supports_brightness
-from .model import build_view, key_map
+from .model import build_view, key_map, level_means_off, next_level
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -282,22 +280,16 @@ class CmdView(HomeAssistantView):
             raw = state.attributes.get("brightness")
             current = 100 if raw is None else max(1, round(int(raw) * 100 / 255))
 
-        if action == "set":
-            try:
-                target = int(body.get("p"))
-            except (TypeError, ValueError):
-                return self.json({"ok": False, "e": "bad_level"})
-        elif action == "up":
-            target = current + DIM_STEP
-        else:
-            target = current - DIM_STEP
+        try:
+            requested = None if body.get("p") is None else int(body.get("p"))
+        except (TypeError, ValueError):
+            return self.json({"ok": False, "e": "bad_level"})
 
-        target = max(0, min(100, target))
+        target = next_level(current, action, requested)
+        if target is None:
+            return self.json({"ok": False, "e": "bad_level"})
 
-        # Anything under the floor is off, not "very dim". Sending
-        # brightness_pct=2 leaves a light that looks off but reports on, and
-        # the next press then raises it from 2 instead of from zero.
-        if target < DIM_MIN:
+        if level_means_off(target):
             ok = await self._call(hass, "light", "turn_off", {"entity_id": entity_id})
             return self.json({"ok": ok, "v": 0} if ok else {"ok": False, "e": "service_failed"})
 

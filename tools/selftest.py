@@ -39,7 +39,10 @@ sys.modules["homeassistant.core"].HomeAssistant = object
 from epixel import icons, preview  # noqa: E402
 from epixel.const import CONF_ICONS, CONF_PAGES, DOMAIN  # noqa: E402
 from epixel.icon_paths import ICON_PATHS  # noqa: E402
-from epixel.model import build_view, clean_text, key_of, tracked_entities  # noqa: E402
+from epixel.model import (  # noqa: E402
+    build_view, clean_text, key_map, key_of, level_means_off, next_level,
+    tracked_entities,
+)
 
 FAILED: list[str] = []
 
@@ -198,6 +201,44 @@ def test_edge_cases() -> None:
           len(tracked_entities(FakeEntry(dup))) == 1)
 
 
+def test_commands() -> None:
+    """Komut yolu -- kullanicinin her basista hissettigi aritmetik.
+
+    Bu mantik once HTTP isleyicisinin icindeydi ve ancak calisan bir Home
+    Assistant ile sinanabiliyordu. Saf bir isleve cikarildi; artik olculuyor.
+    """
+    print("\nkomut yolu")
+
+    check("acmak 0'dan %10'a", next_level(0, "up", None) == 10)
+    check("kismak %50'den %40'a", next_level(50, "down", None) == 40)
+    check("tavan %100'de duruyor", next_level(95, "up", None) == 100)
+    check("taban 0'in altina inmiyor", next_level(5, "down", None) == 0)
+    check("set istenen degeri alir", next_level(0, "set", 40) == 40)
+    check("set tavani asamaz", next_level(0, "set", 400) == 100)
+    check("set eksi deger 0'a kirpilir", next_level(0, "set", -20) == 0)
+    check("set degersiz -> gecersiz", next_level(0, "set", None) is None)
+    check("bilinmeyen eylem -> gecersiz", next_level(0, "yokboyle", None) is None)
+
+    # Esigin ALTI kapali demektir. brightness_pct=2 gonderilseydi, kapali
+    # gorunen ama "acik" raporlayan bir lamba kalirdi ve sonraki basis 2'den
+    # tirmanirdi.
+    check("%4 kapali sayilir", level_means_off(4))
+    check("%5 acik sayilir", not level_means_off(5))
+    check("%0 kapali sayilir", level_means_off(0))
+
+    # up/down CANLI seviyeye gore: duvar anahtarindan degistirilmis bir lamba
+    # ilk basista dogru yere gitmeli.
+    check("canli %70 iken kismak %60", next_level(70, "down", None) == 60)
+
+    pages = [{"title": "K", "entities": ["light.strip_a", "sensor.temp"]}]
+    mapping = key_map(FakeEntry(pages))
+    check("anahtar -> varlik cozulur",
+          mapping.get(key_of("light.strip_a")) == "light.strip_a")
+    check("bilinmeyen anahtar cozulmez", "zzzzzz" not in mapping)
+    check("anahtar 6 hex", all(len(k) == 6 and all(c in "0123456789abcdef" for c in k)
+                               for k in mapping))
+
+
 def test_preview() -> None:
     print("\nonizleme")
     pages = [{"title": "Salon", "entities": list(STATES)[:4]}]
@@ -233,6 +274,7 @@ def main() -> int:
     test_names()
     test_layout_and_types()
     test_edge_cases()
+    test_commands()
     test_preview()
 
     print()

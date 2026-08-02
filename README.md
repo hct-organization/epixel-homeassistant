@@ -198,6 +198,7 @@ Standard library only; nothing to install.
 
 | Symptom | Check |
 |---|---|
+| No logo beside the entry in Devices & Services | Expected for now — Home Assistant loads artwork from its own brands repository. See [brands/](brands/) |
 | Display says "integration not found" | Did Home Assistant restart after installing? |
 | Code not accepted | Codes expire after 3 minutes — generate a new one on the display |
 | "Already configured" | One display per Home Assistant in this version; remove the existing entry first |
@@ -355,6 +356,7 @@ For pricing, lead times, branding and pilot programmes, get in touch by e-mail.
 | **[docs/architecture.html](docs/architecture.html)** | System architecture, services, network topology and security posture — Turkish and English |
 | **[SECURITY.md](SECURITY.md)** | Disclosure address, design notes for researchers, accepted risks |
 | **[CHANGELOG.md](CHANGELOG.md)** | Release history |
+| **[brands/](brands/)** | Artwork prepared for the Home Assistant brands repository |
 
 ## Contributing
 

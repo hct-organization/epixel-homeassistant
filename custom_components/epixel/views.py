@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import hmac
+import ipaddress
 import logging
 import secrets
 import time
@@ -30,7 +31,6 @@ from .const import (
     DOMAIN,
     HISTORY_MAX_HOURS,
     HISTORY_POINTS,
-    LONGPOLL_MAX_S,
     PAIR_MAX_PENDING,
     PAIR_TTL_S,
     PREVIEW_TTL_S,
@@ -59,6 +59,7 @@ def async_register_views(hass: HomeAssistant) -> None:
         CmdView(),
         HistoryView(),
         PreviewView(),
+        AnnounceView(),
     ):
         hass.http.register_view(view)
     data["views_ok"] = True
@@ -185,7 +186,20 @@ class PairView(HomeAssistantView):
 
 
 class StateView(HomeAssistantView):
-    """Pages, boxes and current values in a single document. Long-poll capable."""
+    """Pages, boxes and current values in a single document.
+
+    This used to hold the request open until something changed, which gave
+    push-grade latency without a listening port on the device. It does not any
+    more, because the device now HAS a listening port and gets told directly.
+
+    Holding it open was also what broke the device: a request deliberately kept
+    open for 25 seconds outlived the 15-second task watchdog on a shared task,
+    and the firmware panicked while doing exactly what it had been told. With
+    push carrying the updates, this endpoint answers immediately and that whole
+    class of failure is gone rather than tuned.
+
+    What is left is the fallback the device falls back TO -- see /announce.
+    """
 
     url = f"{API_BASE}/view"
     name = "api:epixel:view"
@@ -196,25 +210,6 @@ class StateView(HomeAssistantView):
         entry = _authed(hass, request)
         if entry is None:
             return self.json({"e": "unauthorized"}, status_code=401)
-
-        data = hass.data[DOMAIN]
-        try:
-            since = int(request.query.get("rev", "0"))
-            wait = int(request.query.get("wait", "0"))
-        except ValueError:
-            since, wait = 0, 0
-        wait = max(0, min(wait, LONGPOLL_MAX_S))
-
-        # When the device already holds the current revision we hold the
-        # request open. A change releases it immediately -- push-grade latency
-        # with no persistent socket.
-        if wait and since == data["rev"]:
-            waiter = data["changed"]
-            try:
-                await asyncio.wait_for(waiter.wait(), wait)
-            except asyncio.TimeoutError:
-                pass
-
         return self.json(build_view(hass, entry))
 
 
@@ -387,7 +382,69 @@ class HistoryView(HomeAssistantView):
         )
 
 
-# ------------------------------------------------------------ 6. preview
+# ----------------------------------------------------------- 6. announce
+
+
+class AnnounceView(HomeAssistantView):
+    """The display tells us where to reach it, so we can stop being asked.
+
+    This is what turns the relationship around. Up to here the device did all
+    the calling; after this we push a new view the moment anything changes, and
+    the device stops polling except as a fallback.
+
+    Repeated on a timer by the device, deliberately. Its address comes from
+    DHCP and can change without warning, and a push to a stale address fails
+    silently -- the screen would simply stop updating with nothing to show why.
+    Re-announcing makes that self-healing instead of permanent.
+    """
+
+    url = f"{API_BASE}/announce"
+    name = "api:epixel:announce"
+    requires_auth = False          # the pairing token authorises, see _authed
+
+    async def post(self, request):
+        hass: HomeAssistant = request.app[KEY_HASS]
+        entry = _authed(hass, request)
+        if entry is None:
+            return self.json({"e": "unauthorised"}, status_code=401)
+
+        try:
+            body = await request.json()
+        except ValueError:
+            return self.json({"e": "bad_json"}, status_code=400)
+
+        ip = str(body.get("ip") or "")
+        port = int(body.get("port") or 0)
+        secret = str(body.get("secret") or "")
+
+        # Only ever push to a private address. Home Assistant would otherwise
+        # make outbound requests to wherever a caller named, which turns this
+        # endpoint into a way of using someone's Home Assistant to reach hosts
+        # they cannot reach themselves.
+        try:
+            parsed = ipaddress.ip_address(ip)
+        except ValueError:
+            return self.json({"e": "bad_ip"}, status_code=400)
+        if not parsed.is_private or parsed.is_loopback:
+            return self.json({"e": "not_private"}, status_code=400)
+        if not 1 <= port <= 65535 or not secret:
+            return self.json({"e": "bad_target"}, status_code=400)
+
+        data = hass.data[DOMAIN]
+        known = data.get("device")
+        data["device"] = {"ip": ip, "port": port, "secret": secret}
+        if not known or known.get("ip") != ip:
+            _LOGGER.info("ePiXeL display reachable at %s:%s -- pushing updates", ip, port)
+
+        # Send the current view straight away. Without this the screen would
+        # wait for the next change, which on a quiet evening could be hours.
+        from . import _schedule_push
+        _schedule_push(hass)
+
+        return self.json({"ok": True})
+
+
+# ------------------------------------------------------------ 7. preview
 
 
 class PreviewView(HomeAssistantView):

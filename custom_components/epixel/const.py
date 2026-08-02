@@ -6,7 +6,7 @@ PROTOCOL.md wins -- the device firmware was written against that document.
 
 DOMAIN = "epixel"
 API_BASE = "/api/epixel"
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3
 
 CONF_TOKEN = "token"
 CONF_DEVICE_NAME = "device_name"
@@ -24,7 +24,6 @@ MAX_BOXES_PER_PAGE = 6
 NAME_MAX = 22             # the screen truncates box titles at this width
 
 # --- Long polling ---
-LONGPOLL_MAX_S = 55       # the device asks for 25; this is the safety ceiling
 
 # --- History / charts ---
 HISTORY_POINTS = 60       # downsample target (~400 bytes on the wire)

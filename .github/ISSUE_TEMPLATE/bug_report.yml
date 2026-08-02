@@ -1,0 +1,70 @@
+name: Bug report
+description: Something in the Home Assistant integration is not working
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. For sales, pricing or hardware questions please
+        e-mail epixel@hctbilisim.com instead — this tracker is for the
+        integration only.
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      placeholder: "2026.7.4"
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: firmware
+    attributes:
+      label: Display firmware version
+      description: Settings → Device info on the display
+      placeholder: "13.x.y"
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        Settings → System → Logs, filtered for `custom_components.epixel`.
+        Please remove anything you would rather not publish.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: Home Assistant was restarted after installing the integration
+          required: true
+        - label: The display and Home Assistant are on the same local network
+          required: true

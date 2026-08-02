@@ -1,0 +1,10 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Sales, pricing and hardware enquiries
+    url: mailto:epixel@hctbilisim.com
+    about: >
+      The ePiXeL display is a business product with a minimum order of 500 units.
+      For pricing, lead times, branding or a pilot programme, e-mail us.
+  - name: Protocol documentation
+    url: https://github.com/hct-organization/epixel-homeassistant/blob/main/PROTOCOL.md
+    about: The wire format shared by this integration and the display firmware.

@@ -177,6 +177,7 @@ def main() -> None:
     print("Ctrl+C to quit.\n")
 
     revision = 0
+    idle = 0
     while True:
         status, view = call(base, f"/view?rev={revision}&wait=25", token=token, timeout=35)
         if status == 401:
@@ -185,7 +186,15 @@ def main() -> None:
             print(f"  ! /view {status}: {view}")
             time.sleep(5)
             continue
-        revision = view.get("rev", revision)
+        new_revision = view.get("rev", revision)
+        if new_revision == revision and revision != 0:
+            # Long poll timed out with nothing new. Say so on one line rather
+            # than redrawing the same page every 25 seconds.
+            idle += 1
+            print(f"  · no change ({idle})", flush=True)
+            continue
+        revision = new_revision
+        idle = 0
         draw(view)
 
 

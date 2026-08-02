@@ -13,6 +13,7 @@ type tomorrow, the firmware does not change.
 from __future__ import annotations
 
 import hashlib
+from collections import Counter
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -60,8 +61,38 @@ def build_view(hass: HomeAssistant, entry: ConfigEntry) -> dict:
             for entity_id in page.get("entities", [])[:MAX_BOXES_PER_PAGE]
         ]
         if boxes:
+            _fit_names(boxes)
             pages.append({"t": str(page.get("title") or "")[:NAME_MAX], "b": boxes})
     return {"rev": hass.data[DOMAIN]["rev"], "pages": pages}
+
+
+def _fit_names(boxes: list[dict]) -> None:
+    """Shorten box titles to the screen width without destroying what tells
+    them apart.
+
+    Cutting at a fixed width is not enough: "Display LED Strip 1" and
+    "Display LED Strip 2" both become "Display LED Strip" and the user is left
+    with two identical boxes and no way to know which is which. Where a
+    collision appears only *because* of truncation, keep both ends instead.
+    """
+    full = [box["n"] for box in boxes]
+    short = [name[:NAME_MAX] for name in full]
+
+    # Collisions are counted BEFORE anything is rewritten. Counting against a
+    # list that is being mutated fixes the first of a colliding pair and then
+    # sees the second as unique, leaving it truncated and still ambiguous.
+    collisions = Counter(short)
+
+    for index, name in enumerate(full):
+        collides = collisions[short[index]] > 1
+        distinct = full.count(name) == 1
+        if collides and distinct and len(name) > NAME_MAX:
+            head = NAME_MAX // 2 - 1
+            tail = NAME_MAX - head - 1
+            short[index] = name[:head] + "…" + name[-tail:]
+
+    for box, name in zip(boxes, short):
+        box["n"] = name
 
 
 def _box(hass: HomeAssistant, entity_id: str) -> dict:
@@ -75,16 +106,18 @@ def _box(hass: HomeAssistant, entity_id: str) -> dict:
     if state is None:
         return {
             "k": key,
-            "n": entity_id.split(".")[-1].replace("_", " ")[:NAME_MAX],
+            "n": entity_id.split(".")[-1].replace("_", " "),
             "y": "txt",
             "v": "—",
             "i": icons.FALLBACK,
         }
 
     attrs = state.attributes
+    # Full name here; _fit_names shortens once the whole page is known, so a
+    # collision between two boxes can be resolved instead of baked in.
     box = {
         "k": key,
-        "n": str(attrs.get("friendly_name") or entity_id)[:NAME_MAX],
+        "n": str(attrs.get("friendly_name") or entity_id),
         "i": icons.pick(domain, attrs.get("device_class"), attrs.get("unit_of_measurement")),
     }
 
